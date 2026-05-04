@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-env" (include "common.names.fullname" .) }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $) | nindent 4 }}
+  {{- end }}
+data:
+  WP_ENV: {{ .Values.site.env | quote }}
+  WP_HOME: {{ .Values.site.url | quote }}
+  WP_SITEURL: {{ printf "%s%s" (.Values.site.url | trimSuffix "/") .Values.site.wpPath | quote }}
+  DB_HOST: {{ include "fp-site.databaseHost" . | quote }}
+  DB_NAME: {{ include "fp-site.databaseName" . | quote }}
+  DB_USER: {{ include "fp-site.databaseUser" . | quote }}
+  REDIS_URL: {{ include "fp-site.cacheUrl" . | quote }}
+  FP_SOUIN_REDIS_HOST: {{ include "fp-site.cacheHost" . | quote }}
+  FP_SOUIN_REDIS_PORT: {{ include "fp-site.cachePort" . | quote }}
+  FP_S3_BUCKET: {{ include "fp-site.s3Bucket" . | quote }}
+  FP_S3_REGION: {{ include "fp-site.s3Region" . | quote }}
+  FP_S3_ENDPOINT: {{ include "fp-site.s3Endpoint" . | quote }}
+  {{- if and (not .Values.minio.enabled) .Values.externalS3.bucketUrl }}
+  FP_S3_BUCKET_URL: {{ .Values.externalS3.bucketUrl | quote }}
+  {{- end }}
+  FP_PORT: "8080"
+  FP_METRICS_PORT: "9145"
+  DISABLE_WP_CRON: "true"

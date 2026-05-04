@@ -1,0 +1,88 @@
+{{- if .Values.wpCron.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ printf "%s-wpcron" (include "common.names.fullname" .) | trunc 52 | trimSuffix "-" }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+spec:
+  schedule: {{ .Values.wpCron.schedule | quote }}
+  concurrencyPolicy: {{ .Values.wpCron.concurrencyPolicy }}
+  successfulJobsHistoryLimit: {{ .Values.wpCron.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.wpCron.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: {{ include "fp-site.serviceAccountName" . }}
+          {{- if .Values.image.pullSecrets }}
+          imagePullSecrets:
+            {{- range .Values.image.pullSecrets }}
+            - name: {{ . }}
+            {{- end }}
+          {{- end }}
+          securityContext: {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+            - name: wpcron
+              image: {{ include "fp-site.image" . }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              securityContext: {{- toYaml .Values.containerSecurityContext | nindent 16 }}
+              command:
+                - wp
+                - --allow-root
+                - --path=/app/web/wp
+                - cron
+                - event
+                - run
+                - --due-now
+              envFrom:
+                - configMapRef:
+                    name: {{ printf "%s-env" (include "common.names.fullname" .) }}
+                {{- if .Values.extraEnvVarsCM }}
+                - configMapRef:
+                    name: {{ tpl .Values.extraEnvVarsCM . }}
+                {{- end }}
+                {{- if .Values.extraEnvVarsSecret }}
+                - secretRef:
+                    name: {{ tpl .Values.extraEnvVarsSecret . }}
+                {{- end }}
+              env:
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "fp-site.databaseSecretName" . }}
+                      key: {{ include "fp-site.databaseSecretPasswordKey" . }}
+                - name: FP_S3_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "fp-site.s3SecretName" . }}
+                      key: {{ include "fp-site.s3AccessKeyKey" . }}
+                - name: FP_S3_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "fp-site.s3SecretName" . }}
+                      key: {{ include "fp-site.s3SecretKeyKey" . }}
+                {{- range $name := list "AUTH_KEY" "SECURE_AUTH_KEY" "LOGGED_IN_KEY" "NONCE_KEY" "AUTH_SALT" "SECURE_AUTH_SALT" "LOGGED_IN_SALT" "NONCE_SALT" }}
+                - name: {{ $name }}
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "fp-site.secretName" $ }}
+                      key: {{ $name }}
+                {{- end }}
+              resources: {{- toYaml .Values.resources | nindent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+                - name: data
+                  mountPath: /data
+          volumes:
+            - name: tmp
+              emptyDir:
+                medium: Memory
+                sizeLimit: {{ .Values.tmpfsSize.tmp }}
+            - name: data
+              emptyDir:
+                medium: Memory
+                sizeLimit: {{ .Values.tmpfsSize.data }}
+{{- end }}

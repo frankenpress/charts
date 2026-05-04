@@ -1,0 +1,46 @@
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.18.0
+
+      - name: helm dependency update
+        run: |
+          for chart in charts/*/; do
+            helm dependency update "$chart"
+          done
+
+      - name: helm lint
+        run: |
+          for chart in charts/*/; do
+            helm lint "$chart"
+          done
+
+      - name: helm template
+        run: |
+          for chart in charts/*/; do
+            helm template smoketest "$chart" --namespace smoketest > /dev/null
+          done
+
+      - uses: helm/chart-testing-action@v2.7.0
+
+      - name: ct lint
+        run: |
+          ct lint --target-branch main --validate-maintainers=false --check-version-increment=false --chart-dirs charts

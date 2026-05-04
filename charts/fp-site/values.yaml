@@ -1,0 +1,448 @@
+# Default values for fp-site.
+# This file is documented Bitnami-style: every public value carries
+# `## @param <path> <description>` annotations so README generators can
+# emit a consistent reference table.
+
+## @section Global parameters
+## Global Docker image parameters that override values in subcharts.
+
+## @param global.imageRegistry Global Docker image registry
+## @param global.imagePullSecrets Global Docker registry secret names as an array
+## @param global.defaultStorageClass Global default StorageClass for Persistent Volume(s)
+##
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  defaultStorageClass: ""
+
+## @section Common parameters
+
+## @param kubeVersion Override Kubernetes version
+## @param nameOverride String to partially override common.names.fullname
+## @param fullnameOverride String to fully override common.names.fullname
+## @param clusterDomain Kubernetes cluster domain name
+## @param commonLabels Labels to add to all deployed objects
+## @param commonAnnotations Annotations to add to all deployed objects
+## @param extraDeploy Array of extra objects to deploy with the release
+##
+kubeVersion: ""
+nameOverride: ""
+fullnameOverride: ""
+clusterDomain: cluster.local
+commonLabels: {}
+commonAnnotations: {}
+extraDeploy: []
+
+## @section FrankenPress site image
+## The site image you built from fp-site-template (or your fork of it).
+
+## @param image.registry [default: REGISTRY_NAME] Site image registry
+## @param image.repository [default: REPOSITORY_NAME/fp-site] Site image repository
+## @skip image.tag Site image tag (immutable tags are recommended). Defaults to chart appVersion
+## @param image.digest Site image digest in the way sha256:aaaa...
+## @param image.pullPolicy Site image pull policy
+## @param image.pullSecrets Site image pull secrets
+##
+image:
+  registry: ghcr.io
+  repository: eightoeight/fp-site-template
+  tag: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+## @section Site configuration
+
+## @param site.url Public URL of the site (no trailing slash). Used to set WP_HOME and WP_SITEURL
+## @param site.env WP_ENV value — `development`, `staging`, or `production`
+## @param site.wpPath Path under site.url where WordPress core lives. Bedrock convention is `/wp`
+##
+site:
+  url: "http://fp-site.localhost"
+  env: production
+  wpPath: /wp
+
+## @section WordPress auth keys + salts
+## Eight constants WP requires for cookie/nonce signing. The chart can
+## auto-generate them on first install via a one-shot Job (default), or
+## you can point at an existing Secret.
+
+## @param keysSalts.autoGenerate If true, install a Job that creates the keys+salts Secret if it doesn't exist
+## @param keysSalts.existingSecret Pre-existing Secret with the 8 keys/salts (overrides auto-generate)
+##
+keysSalts:
+  autoGenerate: true
+  existingSecret: ""
+
+## @section Replicas + scheduling
+
+## @param replicaCount Number of WP pod replicas
+## @param updateStrategy.type Site deployment update strategy
+## @param updateStrategy.rollingUpdate.maxSurge Max surge during rolling update
+## @param updateStrategy.rollingUpdate.maxUnavailable Max unavailable during rolling update
+##
+replicaCount: 1
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+## @param podLabels Extra labels for the site pods
+## @param podAnnotations Extra annotations for the site pods
+## @param nodeSelector Node labels for pod assignment
+## @param tolerations Tolerations for pod assignment
+## @param affinity Affinity for pod assignment
+## @param topologySpreadConstraints Topology spread constraints for the site pod
+## @param priorityClassName Pod priority class name
+##
+podLabels: {}
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+priorityClassName: ""
+
+## @section Resources + probes
+
+## @param resources.requests.cpu CPU request for the site container
+## @param resources.requests.memory Memory request for the site container
+## @param resources.limits.cpu CPU limit for the site container
+## @param resources.limits.memory Memory limit for the site container
+##
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+## @param livenessProbe.enabled Enable liveness probe
+## @param livenessProbe.httpGet.path HTTP path for liveness probe
+## @param livenessProbe.httpGet.port HTTP port for liveness probe
+## @param livenessProbe.initialDelaySeconds Initial delay
+## @param livenessProbe.periodSeconds Period
+## @param livenessProbe.timeoutSeconds Timeout
+## @param livenessProbe.failureThreshold Failure threshold
+##
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 6
+
+## @param readinessProbe.enabled Enable readiness probe
+## @param readinessProbe.httpGet.path HTTP path for readiness probe
+## @param readinessProbe.httpGet.port HTTP port for readiness probe
+##
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+## @section Security context (production-grade defaults)
+
+## @param podSecurityContext.runAsNonRoot Run pod as non-root
+## @param podSecurityContext.runAsUser User ID to run pod as (33 = www-data)
+## @param podSecurityContext.fsGroup Filesystem group
+##
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 33
+  fsGroup: 33
+
+## @param containerSecurityContext.runAsNonRoot Run container as non-root
+## @param containerSecurityContext.runAsUser User to run container as
+## @param containerSecurityContext.allowPrivilegeEscalation Allow privilege escalation
+## @param containerSecurityContext.readOnlyRootFilesystem Read-only root filesystem
+## @param containerSecurityContext.capabilities.drop Capabilities to drop
+## @param containerSecurityContext.capabilities.add Capabilities to add
+##
+## Note on `cap_net_bind_service`: the FrankenPHP binary inside fp-runtime
+## ships with `cap_net_bind_service=ep` set on the binary (so it can bind
+## :80 / :443 without root). With strict pod security (drop: [ALL]), the
+## kernel refuses to exec a binary that carries file capabilities — you'd
+## hit `exec: frankenphp: Operation not permitted`.
+##
+## Two ways to harden further:
+##   1. (this chart): keep `add: [NET_BIND_SERVICE]` so the kernel honors
+##      the file cap. Container can bind low ports but nothing else.
+##   2. (fp-runtime): build with `setcap -r /usr/local/bin/frankenphp`
+##      after the COPY step. The binary loses the file cap; we never
+##      bind low ports anyway (FP_PORT defaults to 8080). Then this
+##      chart can flip back to `drop: [ALL]` with no `add:`.
+##
+## Default keeps option 1 so the chart works against fp-runtime today.
+##
+## `allowPrivilegeEscalation` defaults to `true` because the no_new_privs
+## flag (set when this is `false`) makes the kernel refuse to exec a
+## binary that carries file capabilities — and the FrankenPHP binary
+## ships with cap_net_bind_service=ep set. After fp-runtime ships an
+## image with the file cap stripped (`setcap -r`), this can flip back
+## to `false`.
+containerSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 33
+  allowPrivilegeEscalation: true
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+    add:
+      - NET_BIND_SERVICE
+
+## @section Service
+
+## @param service.type Service type
+## @param service.ports.http HTTP service port
+## @param service.ports.metrics Prometheus metrics service port
+## @param service.clusterIP Static cluster IP (use `None` for headless)
+## @param service.annotations Service annotations
+##
+service:
+  type: ClusterIP
+  ports:
+    http: 80
+    metrics: 9145
+  clusterIP: ""
+  annotations: {}
+
+## @section Ingress (optional)
+
+## @param ingress.enabled Enable Ingress controller resource
+## @param ingress.className IngressClassName
+## @param ingress.hostname Hostname (e.g. mysite.example.com)
+## @param ingress.path Path under the hostname
+## @param ingress.pathType Path type (`Prefix`, `Exact`, etc.)
+## @param ingress.annotations Ingress annotations
+## @param ingress.tls Enable TLS — set to `true` to add a tls section using `ingress.hostname`
+##
+ingress:
+  enabled: false
+  className: ""
+  hostname: fp-site.localhost
+  path: /
+  pathType: Prefix
+  annotations: {}
+  tls: false
+
+## @section Gateway API HTTPRoute (optional)
+
+## @param httpRoute.enabled Enable Gateway API HTTPRoute
+## @param httpRoute.parentRefs Parent Gateway references (array of {name, namespace, sectionName, port})
+## @param httpRoute.hostnames Hostnames the route matches
+##
+httpRoute:
+  enabled: false
+  parentRefs: []
+  hostnames: []
+
+## @section ServiceAccount
+
+## @param serviceAccount.create Create a ServiceAccount for the site pod
+## @param serviceAccount.name ServiceAccount name (auto-derived if empty)
+## @param serviceAccount.annotations ServiceAccount annotations (e.g. IRSA)
+## @param serviceAccount.automountServiceAccountToken Automount the SA token
+##
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automountServiceAccountToken: false
+
+## @section Horizontal Pod Autoscaling (optional)
+
+## @param autoscaling.enabled Enable HPA
+## @param autoscaling.minReplicas Min replicas
+## @param autoscaling.maxReplicas Max replicas
+## @param autoscaling.targetCPUUtilizationPercentage Target CPU utilisation
+## @param autoscaling.targetMemoryUtilizationPercentage Target memory utilisation
+##
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: ""
+
+## @section wp-cron CronJob
+
+## @param wpCron.enabled Enable WP cron CronJob (recommended; disable WP's request-triggered cron with DISABLE_WP_CRON=true)
+## @param wpCron.schedule Cron schedule
+## @param wpCron.successfulJobsHistoryLimit Number of successful job pods to retain
+## @param wpCron.failedJobsHistoryLimit Number of failed job pods to retain
+## @param wpCron.concurrencyPolicy `Allow`, `Forbid`, or `Replace`
+##
+wpCron:
+  enabled: true
+  schedule: "*/5 * * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid
+
+## @section Extra environment variables
+## Extend without modifying the chart. Useful for site-specific env.
+
+## @param extraEnvVars Array of extra env vars passed to the site pod
+## @param extraEnvVarsCM Name of a ConfigMap to load extra env vars from
+## @param extraEnvVarsSecret Name of a Secret to load extra env vars from
+##
+extraEnvVars: []
+extraEnvVarsCM: ""
+extraEnvVarsSecret: ""
+
+## @section Filesystem
+## The site image is read-only at the root; tmpfs mounts are required for
+## /tmp (PHP scratch) and /data (Caddy state).
+
+## @param tmpfsSize.tmp Size of the /tmp tmpfs
+## @param tmpfsSize.data Size of the /data tmpfs (Caddy state)
+##
+tmpfsSize:
+  tmp: 256Mi
+  data: 64Mi
+
+## @section MariaDB subchart (bitnami/mariadb)
+## **Default-enabled for instant on-cluster deploy. NOT recommended for
+## production** — use mariadb-operator (https://github.com/mariadb-operator/mariadb-operator)
+## or a managed RDS-style service for production. When `mariadb.enabled`
+## is `false`, set `externalDatabase.*` instead.
+
+mariadb:
+  ## @param mariadb.enabled Deploy a MariaDB sidecar via the bitnami/mariadb subchart
+  enabled: true
+  # See note on bitnamilegacy in the minio block above.
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/mariadb
+    pullPolicy: IfNotPresent
+  auth:
+    rootPassword: ""
+    database: wordpress
+    username: wordpress
+    password: ""
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi
+
+## @section External database (when mariadb.enabled = false)
+
+## @param externalDatabase.host External DB host
+## @param externalDatabase.port External DB port
+## @param externalDatabase.database Database name
+## @param externalDatabase.user Database user
+## @param externalDatabase.password Database password (use existingSecret in production)
+## @param externalDatabase.existingSecret Pre-existing Secret containing the password
+## @param externalDatabase.existingSecretPasswordKey Key in the Secret holding the password
+##
+externalDatabase:
+  host: ""
+  port: 3306
+  database: wordpress
+  user: wordpress
+  password: ""
+  existingSecret: ""
+  existingSecretPasswordKey: mariadb-password
+
+## @section Redis subchart (bitnami/redis) — Souin HTTP cache backend
+## **Default-enabled for instant on-cluster deploy. For production use
+## the DragonflyDB Operator** (https://github.com/dragonflydb/dragonfly-operator) —
+## same RESP protocol, dramatically better single-node throughput. Set
+## `redis.enabled: false` and point `externalCache.*` at the Dragonfly
+## Service.
+
+redis:
+  ## @param redis.enabled Deploy a Redis sidecar via the bitnami/redis subchart
+  enabled: true
+  architecture: standalone
+  # See note on bitnamilegacy in the minio block above.
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/redis
+    pullPolicy: IfNotPresent
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: false  # Souin cache is regenerable; persistence costs ops without value
+
+## @section External cache (when redis.enabled = false)
+
+## @param externalCache.host External Redis-compatible host (DragonflyDB Operator endpoint, etc.)
+## @param externalCache.port External cache port
+## @param externalCache.password Password (or set existingSecret)
+## @param externalCache.existingSecret Pre-existing Secret with the password
+## @param externalCache.existingSecretPasswordKey Key in the Secret
+##
+externalCache:
+  host: ""
+  port: 6379
+  password: ""
+  existingSecret: ""
+  existingSecretPasswordKey: redis-password
+
+## @section MinIO subchart (bitnami/minio) — S3-compatible object storage
+## **Default-enabled for instant on-cluster deploy. For production use
+## AWS S3** (or any S3-compatible: R2, GCS XML, etc.) and set
+## `minio.enabled: false` + `externalS3.*`.
+
+minio:
+  ## @param minio.enabled Deploy a MinIO sidecar via the bitnami/minio subchart
+  enabled: true
+  # Bitnami moved their public images to `bitnamilegacy/*` in 2025
+  # ("Bitnami Secure Images" commercial pivot — the previous
+  # `bitnami/minio` tags were withdrawn from free Docker Hub). Override
+  # every Bitnami image the chart references to the legacy mirror.
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/minio
+    pullPolicy: IfNotPresent
+  clientImage:
+    registry: docker.io
+    repository: bitnamilegacy/minio-client
+  console:
+    image:
+      registry: docker.io
+      repository: bitnamilegacy/minio-object-browser
+  provisioning:
+    image:
+      registry: docker.io
+      repository: bitnamilegacy/os-shell
+  auth:
+    rootUser: minio
+    rootPassword: ""
+  defaultBuckets: site-media
+  persistence:
+    enabled: true
+    size: 8Gi
+
+## @section External S3-compatible storage (when minio.enabled = false)
+
+## @param externalS3.bucket S3 bucket name
+## @param externalS3.region S3 region
+## @param externalS3.endpoint Custom endpoint URL (leave empty for AWS S3; set for R2 / GCS XML / MinIO)
+## @param externalS3.bucketUrl Public URL clients use to fetch media (CDN URL or bucket URL)
+## @param externalS3.accessKey Access key id (or use existingSecret)
+## @param externalS3.secretKey Secret access key (or use existingSecret)
+## @param externalS3.existingSecret Pre-existing Secret with `access-key` and `secret-key` keys
+##
+externalS3:
+  bucket: site-media
+  region: us-east-1
+  endpoint: ""
+  bucketUrl: ""
+  accessKey: ""
+  secretKey: ""
+  existingSecret: ""
