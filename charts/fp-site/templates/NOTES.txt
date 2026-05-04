@@ -1,0 +1,53 @@
+CHART NAME:    {{ .Chart.Name }}
+CHART VERSION: {{ .Chart.Version }}
+APP VERSION:   {{ .Chart.AppVersion }}
+
+Welcome to FrankenPress.
+
+** Please be patient while the site comes up — the first install bootstraps WP and seeds the database. **
+
+The site image is:
+  {{ include "fp-site.image" . }}
+
+To reach it from inside the cluster:
+  http://{{ include "common.names.fullname" . }}.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}:{{ .Values.service.ports.http }}
+
+{{- if .Values.ingress.enabled }}
+
+External URL (Ingress):
+  http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.hostname }}{{ .Values.ingress.path }}
+{{- else if .Values.httpRoute.enabled }}
+
+External URL (Gateway API HTTPRoute):
+{{- range .Values.httpRoute.hostnames }}
+  http://{{ . }}/
+{{- end }}
+{{- else }}
+
+No Ingress / HTTPRoute is enabled. To expose locally on a kind cluster:
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "common.names.fullname" . }} 8080:{{ .Values.service.ports.http }}
+  open http://localhost:8080/wp/wp-admin/install.php
+{{- end }}
+
+{{- if .Values.mariadb.enabled }}
+
+** MariaDB subchart enabled (NOT for production).
+   Production: disable with `--set mariadb.enabled=false` and supply
+   `externalDatabase.*` (we recommend mariadb-operator).
+{{- end }}
+{{- if .Values.redis.enabled }}
+
+** Redis subchart enabled (NOT for production).
+   Production: disable with `--set redis.enabled=false` and supply
+   `externalCache.*` (we strongly recommend the DragonflyDB Operator —
+   same RESP protocol, dramatically better single-node throughput:
+   https://github.com/dragonflydb/dragonfly-operator).
+{{- end }}
+{{- if .Values.minio.enabled }}
+
+** MinIO subchart enabled (NOT for production).
+   Production: disable with `--set minio.enabled=false` and supply
+   `externalS3.*` pointing at AWS S3 / R2 / GCS XML.
+{{- end }}
+
+For the full values reference: `helm show values oci://ghcr.io/eightoeight/charts/fp-site`

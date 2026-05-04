@@ -1,0 +1,69 @@
+apiVersion: v2
+name: fp-site
+description: FrankenPress WordPress site — Caddy + FrankenPHP + Souin (HTTP cache) + humanmade/s3-uploads (media offload). Deploys a single site image (built from fp-site-template) plus optional in-cluster MariaDB / Redis / MinIO subcharts for instant on-cluster deployment.
+type: application
+icon: https://eightoeight.io/icon.png
+
+# Chart version. Bumped on every change to templates / values / Chart.yaml.
+version: 0.1.0
+
+# Application version. Tracks the fp-site-template release we test against.
+appVersion: "0.1.0"
+
+kubeVersion: ">=1.27.0-0"
+
+keywords:
+  - wordpress
+  - frankenphp
+  - caddy
+  - souin
+  - s3
+  - bedrock
+
+home: https://github.com/EightOEight/fp-charts
+sources:
+  - https://github.com/EightOEight/fp-charts
+  - https://github.com/EightOEight/fp-runtime
+  - https://github.com/EightOEight/fp-mu-plugin
+  - https://github.com/EightOEight/fp-site-template
+
+maintainers:
+  - name: EightOEight Ltd.
+    email: hello@eightoeight.io
+    url: https://eightoeight.io
+
+annotations:
+  # Used by ArtifactHub-style consumers.
+  category: CMS
+  licenses: Apache-2.0
+
+# Dependencies.
+#
+# All Bitnami subcharts (mariadb, minio, redis) are conditional and
+# default-enabled for instant on-cluster deployment. **They are not
+# recommended for production** — see chart README for the production
+# topology (DragonflyDB Operator + MariaDB Operator + AWS S3).
+#
+# `common` is a library chart and always loads (provides Bitnami's
+# helper templates: common.names.fullname, common.labels.standard, etc.).
+dependencies:
+  - name: common
+    version: 2.38.0
+    repository: oci://registry-1.docker.io/bitnamicharts
+    tags:
+      - bitnami-common
+
+  - name: mariadb
+    version: 25.0.10
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: mariadb.enabled
+
+  - name: redis
+    version: 25.4.1
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: redis.enabled
+
+  - name: minio
+    version: 17.0.21
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: minio.enabled
