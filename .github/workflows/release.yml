@@ -2,8 +2,13 @@ name: release
 
 on:
   push:
-    branches: [main]
+    tags: ['v*.*.*']
   workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to release from (defaults to current branch)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
