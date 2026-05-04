@@ -47,10 +47,8 @@ jobs:
             helm push "$tgz" "oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts"
           done
 
-      # GitHub-release-style chart-releaser as a backup distribution channel.
-      - uses: helm/chart-releaser-action@v1.7.0
-        with:
-          charts_dir: charts
-          skip_existing: true
-        env:
-          CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # OCI is our canonical distribution channel. We previously also
+      # ran helm/chart-releaser-action as a github-release fallback, but
+      # it requires a `gh-pages` branch we don't maintain — and OCI
+      # gives consumers `helm install oci://ghcr.io/...` which is the
+      # documented quickstart path.
