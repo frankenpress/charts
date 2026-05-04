@@ -3,6 +3,8 @@
 **FrankenPress Helm charts** — Kubernetes deployment for the [FrankenPress
 WordPress stack](https://github.com/EightOEight).
 
+**Documentation:** <https://docs.frankenpress.com/components/fp-charts>
+
 ## Charts
 
 | Chart | Description |
