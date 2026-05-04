@@ -166,16 +166,41 @@ podSecurityContext:
 ## @param containerSecurityContext.runAsUser User to run container as
 ## @param containerSecurityContext.allowPrivilegeEscalation Allow privilege escalation
 ## @param containerSecurityContext.readOnlyRootFilesystem Read-only root filesystem
-## @param containerSecurityContext.capabilities.drop Drop all capabilities
+## @param containerSecurityContext.capabilities.drop Capabilities to drop
+## @param containerSecurityContext.capabilities.add Capabilities to add
 ##
+## Note on `cap_net_bind_service`: the FrankenPHP binary inside fp-runtime
+## ships with `cap_net_bind_service=ep` set on the binary (so it can bind
+## :80 / :443 without root). With strict pod security (drop: [ALL]), the
+## kernel refuses to exec a binary that carries file capabilities — you'd
+## hit `exec: frankenphp: Operation not permitted`.
+##
+## Two ways to harden further:
+##   1. (this chart): keep `add: [NET_BIND_SERVICE]` so the kernel honors
+##      the file cap. Container can bind low ports but nothing else.
+##   2. (fp-runtime): build with `setcap -r /usr/local/bin/frankenphp`
+##      after the COPY step. The binary loses the file cap; we never
+##      bind low ports anyway (FP_PORT defaults to 8080). Then this
+##      chart can flip back to `drop: [ALL]` with no `add:`.
+##
+## Default keeps option 1 so the chart works against fp-runtime today.
+##
+## `allowPrivilegeEscalation` defaults to `true` because the no_new_privs
+## flag (set when this is `false`) makes the kernel refuse to exec a
+## binary that carries file capabilities — and the FrankenPHP binary
+## ships with cap_net_bind_service=ep set. After fp-runtime ships an
+## image with the file cap stripped (`setcap -r`), this can flip back
+## to `false`.
 containerSecurityContext:
   runAsNonRoot: true
   runAsUser: 33
-  allowPrivilegeEscalation: false
+  allowPrivilegeEscalation: true
   readOnlyRootFilesystem: true
   capabilities:
     drop:
       - ALL
+    add:
+      - NET_BIND_SERVICE
 
 ## @section Service
 
@@ -297,6 +322,11 @@ tmpfsSize:
 mariadb:
   ## @param mariadb.enabled Deploy a MariaDB sidecar via the bitnami/mariadb subchart
   enabled: true
+  # See note on bitnamilegacy in the minio block above.
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/mariadb
+    pullPolicy: IfNotPresent
   auth:
     rootPassword: ""
     database: wordpress
@@ -337,6 +367,11 @@ redis:
   ## @param redis.enabled Deploy a Redis sidecar via the bitnami/redis subchart
   enabled: true
   architecture: standalone
+  # See note on bitnamilegacy in the minio block above.
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/redis
+    pullPolicy: IfNotPresent
   auth:
     enabled: false
   master:
@@ -358,47 +393,40 @@ externalCache:
   existingSecret: ""
   existingSecretPasswordKey: redis-password
 
-## @section In-cluster MinIO — S3-compatible object storage
-## **Default-enabled for instant on-cluster deploy. NOT for production**
-## (use AWS S3 or any S3-compatible: R2, GCS XML, etc. — set
-## `minio.enabled: false` + `externalS3.*`).
-##
-## Implementation note: rendered inline by this chart (templates/minio*.yaml)
-## using the upstream `minio/minio` image, NOT the bitnami/minio subchart
-## (which moved to a paid commercial registry in 2025).
+## @section MinIO subchart (bitnami/minio) — S3-compatible object storage
+## **Default-enabled for instant on-cluster deploy. For production use
+## AWS S3** (or any S3-compatible: R2, GCS XML, etc.) and set
+## `minio.enabled: false` + `externalS3.*`.
 
 minio:
-  ## @param minio.enabled Render an in-cluster MinIO Deployment + Service + PVC + bucket-bootstrap Job
+  ## @param minio.enabled Deploy a MinIO sidecar via the bitnami/minio subchart
   enabled: true
-  ## @param minio.image.repository MinIO image
-  ## @param minio.image.tag MinIO image tag (RELEASE-style date tag from min.io)
-  ## @param minio.image.pullPolicy MinIO image pull policy
+  # Bitnami moved their public images to `bitnamilegacy/*` in 2025
+  # ("Bitnami Secure Images" commercial pivot — the previous
+  # `bitnami/minio` tags were withdrawn from free Docker Hub). Override
+  # every Bitnami image the chart references to the legacy mirror.
   image:
-    repository: minio/minio
-    tag: RELEASE.2025-09-07T16-13-09Z
+    registry: docker.io
+    repository: bitnamilegacy/minio
     pullPolicy: IfNotPresent
-  ## @param minio.mcImage Image used by the bucket-bootstrap Job
-  mcImage: minio/mc:RELEASE.2025-09-07T15-37-32Z
-  ## @param minio.auth.rootUser MinIO root user
-  ## @param minio.auth.rootPassword MinIO root password (auto-generated if empty)
+  clientImage:
+    registry: docker.io
+    repository: bitnamilegacy/minio-client
+  console:
+    image:
+      registry: docker.io
+      repository: bitnamilegacy/minio-object-browser
+  provisioning:
+    image:
+      registry: docker.io
+      repository: bitnamilegacy/os-shell
   auth:
     rootUser: minio
     rootPassword: ""
-  ## @param minio.defaultBuckets Bucket name to create on first start
   defaultBuckets: site-media
-  ## @param minio.persistence.enabled Persistent storage for the MinIO data dir
-  ## @param minio.persistence.size PVC size
   persistence:
     enabled: true
     size: 8Gi
-  ## @param minio.resources Resource requests/limits
-  resources:
-    requests:
-      cpu: 50m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
 
 ## @section External S3-compatible storage (when minio.enabled = false)
 

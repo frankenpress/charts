@@ -28,11 +28,13 @@ Name of the keys+salts Secret. Auto-generated default, or an existing one.
 
 {{/*
 Database host. When the in-chart MariaDB subchart is enabled, the
-`<release>-mariadb` service is the canonical Service name for bitnami/mariadb.
+`<release>-mariadb` service is the canonical Service name for bitnami/mariadb
+(the subchart's own `common.names.fullname` produces `<release>-mariadb`,
+not `<release>-<our-chart-name>-mariadb`).
 */}}
 {{- define "fp-site.databaseHost" -}}
 {{- if .Values.mariadb.enabled -}}
-{{ printf "%s-mariadb" (include "common.names.fullname" .) }}
+{{ printf "%s-mariadb" .Release.Name }}
 {{- else -}}
 {{ .Values.externalDatabase.host }}
 {{- end -}}
@@ -55,7 +57,7 @@ Name of the Secret holding the DB password (subchart-managed or external).
 */}}
 {{- define "fp-site.databaseSecretName" -}}
 {{- if .Values.mariadb.enabled -}}
-{{ printf "%s-mariadb" (include "common.names.fullname" .) }}
+{{ printf "%s-mariadb" .Release.Name }}
 {{- else if .Values.externalDatabase.existingSecret -}}
 {{ tpl .Values.externalDatabase.existingSecret . }}
 {{- else -}}
@@ -76,7 +78,7 @@ Cache (Redis-compatible) host.
 */}}
 {{- define "fp-site.cacheHost" -}}
 {{- if .Values.redis.enabled -}}
-{{ printf "%s-redis-master" (include "common.names.fullname" .) }}
+{{ printf "%s-redis-master" .Release.Name }}
 {{- else -}}
 {{ .Values.externalCache.host }}
 {{- end -}}
@@ -95,7 +97,7 @@ S3 endpoint host. For in-chart MinIO, point at the subchart's Service.
 */}}
 {{- define "fp-site.s3Endpoint" -}}
 {{- if .Values.minio.enabled -}}
-{{ printf "http://%s-minio:9000" (include "common.names.fullname" .) }}
+{{ printf "http://%s-minio:9000" .Release.Name }}
 {{- else -}}
 {{ .Values.externalS3.endpoint }}
 {{- end -}}
@@ -118,7 +120,7 @@ Name of the Secret holding S3 access keys.
 */}}
 {{- define "fp-site.s3SecretName" -}}
 {{- if .Values.minio.enabled -}}
-{{ printf "%s-minio" (include "common.names.fullname" .) }}
+{{ printf "%s-minio" .Release.Name }}
 {{- else if .Values.externalS3.existingSecret -}}
 {{ tpl .Values.externalS3.existingSecret . }}
 {{- else -}}
