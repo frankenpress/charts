@@ -1,0 +1,7 @@
+.DS_Store
+*.log
+
+# Helm
+charts/*/charts/
+charts/*/Chart.lock
+*.tgz
