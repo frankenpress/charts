@@ -63,7 +63,9 @@ dependencies:
     repository: oci://registry-1.docker.io/bitnamicharts
     condition: redis.enabled
 
-  - name: minio
-    version: 17.0.21
-    repository: oci://registry-1.docker.io/bitnamicharts
-    condition: minio.enabled
+  # Note: we intentionally do NOT use bitnami/minio. Bitnami withdrew
+  # `bitnami/minio` from free public Docker Hub in 2025 (their "Secure
+  # Images" commercial pivot — the chart pulls a tag that's no longer
+  # available without a paid subscription). Instead we render our own
+  # MinIO Deployment + Service + PVC + bucket-bootstrap Job inline,
+  # using the upstream `minio/minio` image. See templates/minio*.yaml.

@@ -358,21 +358,47 @@ externalCache:
   existingSecret: ""
   existingSecretPasswordKey: redis-password
 
-## @section MinIO subchart (bitnami/minio) — S3-compatible object storage
-## **Default-enabled for instant on-cluster deploy. For production use
-## AWS S3** (or any S3-compatible: R2, GCS XML, etc.) and set
-## `minio.enabled: false` + `externalS3.*`.
+## @section In-cluster MinIO — S3-compatible object storage
+## **Default-enabled for instant on-cluster deploy. NOT for production**
+## (use AWS S3 or any S3-compatible: R2, GCS XML, etc. — set
+## `minio.enabled: false` + `externalS3.*`).
+##
+## Implementation note: rendered inline by this chart (templates/minio*.yaml)
+## using the upstream `minio/minio` image, NOT the bitnami/minio subchart
+## (which moved to a paid commercial registry in 2025).
 
 minio:
-  ## @param minio.enabled Deploy a MinIO sidecar via the bitnami/minio subchart
+  ## @param minio.enabled Render an in-cluster MinIO Deployment + Service + PVC + bucket-bootstrap Job
   enabled: true
+  ## @param minio.image.repository MinIO image
+  ## @param minio.image.tag MinIO image tag (RELEASE-style date tag from min.io)
+  ## @param minio.image.pullPolicy MinIO image pull policy
+  image:
+    repository: minio/minio
+    tag: RELEASE.2025-09-07T16-13-09Z
+    pullPolicy: IfNotPresent
+  ## @param minio.mcImage Image used by the bucket-bootstrap Job
+  mcImage: minio/mc:RELEASE.2025-09-07T15-37-32Z
+  ## @param minio.auth.rootUser MinIO root user
+  ## @param minio.auth.rootPassword MinIO root password (auto-generated if empty)
   auth:
     rootUser: minio
     rootPassword: ""
-  defaultBuckets: "site-media"
+  ## @param minio.defaultBuckets Bucket name to create on first start
+  defaultBuckets: site-media
+  ## @param minio.persistence.enabled Persistent storage for the MinIO data dir
+  ## @param minio.persistence.size PVC size
   persistence:
     enabled: true
     size: 8Gi
+  ## @param minio.resources Resource requests/limits
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
 ## @section External S3-compatible storage (when minio.enabled = false)
 
