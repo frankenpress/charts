@@ -121,6 +121,8 @@ spec:
               mountPath: /tmp
             - name: data
               mountPath: /data
+            - name: config
+              mountPath: /config
       volumes:
         - name: tmp
           emptyDir:
@@ -130,3 +132,7 @@ spec:
           emptyDir:
             medium: Memory
             sizeLimit: {{ .Values.tmpfsSize.data }}
+        - name: config
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.tmpfsSize.config }}
