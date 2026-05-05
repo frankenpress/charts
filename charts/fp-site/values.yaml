@@ -343,15 +343,20 @@ extraEnvVarsCM: ""
 extraEnvVarsSecret: ""
 
 ## @section Filesystem
-## The site image is read-only at the root; tmpfs mounts are required for
-## /tmp (PHP scratch) and /data (Caddy state).
+## The site image is read-only at the root; tmpfs mounts are required
+## for the writable paths fp-runtime expects:
+##   /tmp     — PHP scratch
+##   /data    — XDG_DATA_HOME (Caddy data + TLS storage)
+##   /config  — XDG_CONFIG_HOME (Caddy autosave.json)
 
 ## @param tmpfsSize.tmp Size of the /tmp tmpfs
-## @param tmpfsSize.data Size of the /data tmpfs (Caddy state)
+## @param tmpfsSize.data Size of the /data tmpfs (Caddy data, XDG_DATA_HOME)
+## @param tmpfsSize.config Size of the /config tmpfs (Caddy autosave, XDG_CONFIG_HOME)
 ##
 tmpfsSize:
   tmp: 256Mi
   data: 64Mi
+  config: 16Mi
 
 ## @section MariaDB subchart (bitnami/mariadb)
 ## **Default-enabled for instant on-cluster deploy. NOT recommended for

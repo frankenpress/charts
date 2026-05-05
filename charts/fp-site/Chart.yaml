@@ -5,7 +5,7 @@ type: application
 icon: https://eightoeight.io/icon.png
 
 # Chart version. Bumped on every change to templates / values / Chart.yaml.
-version: 0.2.0
+version: 0.2.1
 
 # Application version. Tracks the fp-site-template release we test against.
 appVersion: "0.1.0"
