@@ -26,7 +26,37 @@ External URL (Gateway API HTTPRoute):
 
 No Ingress / HTTPRoute is enabled. To expose locally on a kind cluster:
   kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "common.names.fullname" . }} 8080:{{ .Values.service.ports.http }}
-  open http://localhost:8080/wp/wp-admin/install.php
+  open http://localhost:8080/wp/wp-admin/
+{{- end }}
+
+{{- if .Values.siteInstall.enabled }}
+{{- if and .Values.siteInstall.autoGenerate (empty .Values.siteInstall.existingSecret) }}
+
+WordPress is installed automatically by a post-install Helm hook Job.
+Retrieve the auto-generated admin password:
+
+  kubectl --namespace {{ .Release.Namespace }} get secret {{ include "fp-site.siteInstallSecretName" . }} \
+    -o jsonpath='{.data.admin_password}' | base64 -d
+
+Log in as `{{ .Values.siteInstall.adminUser }}` with the password above.
+{{- else }}
+
+WordPress is installed automatically by a post-install Helm hook Job.
+Admin credentials live in the existing Secret `{{ include "fp-site.siteInstallSecretName" . }}`.
+{{- end }}
+{{- else }}
+
+`siteInstall.enabled=false` — `wp core install` is NOT run by this chart.
+Run it yourself once the site pod is Ready:
+
+  kubectl --namespace {{ .Release.Namespace }} exec deploy/{{ include "common.names.fullname" . }} -- \
+    wp --allow-root --path=/app/web/wp core install \
+      --url={{ .Values.site.url }} \
+      --title="My site" \
+      --admin_user=admin \
+      --admin_email=admin@example.com \
+      --admin_password=<your-password> \
+      --skip-email
 {{- end }}
 
 {{- if .Values.mariadb.enabled }}
