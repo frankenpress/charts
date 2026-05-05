@@ -74,6 +74,46 @@ keysSalts:
   autoGenerate: true
   existingSecret: ""
 
+## @section First-time install
+## A post-install/post-upgrade Helm hook Job runs `wp core install`
+## (idempotent via `wp core is-installed`) and `wp core update-db`. Admin
+## credentials come from an auto-generated Secret unless `existingSecret`
+## is set. When `syncAdminCredentials: true`, every post-upgrade run
+## reconciles wp_users to match the Secret — useful when an external
+## system (External Secrets Operator, Sealed Secrets, manual rotation)
+## is the source of truth for the admin password.
+
+## @param siteInstall.enabled Run wp core install on first deploy
+## @param siteInstall.title Site title shown in wp-admin
+## @param siteInstall.adminUser Admin username (when autoGenerate)
+## @param siteInstall.adminEmail Admin email (when autoGenerate)
+## @param siteInstall.adminPassword Admin password (leave empty to generate)
+## @param siteInstall.autoGenerate Manage admin credentials in a chart-rendered Secret
+## @param siteInstall.existingSecret Pre-existing Secret with admin credentials (any source: manual, ESO, Sealed Secrets, etc.)
+## @param siteInstall.existingSecretAdminUserKey Key in existingSecret holding the admin username
+## @param siteInstall.existingSecretAdminEmailKey Key in existingSecret holding the admin email
+## @param siteInstall.existingSecretAdminPasswordKey Key in existingSecret holding the admin password
+## @param siteInstall.syncAdminCredentials On every post-upgrade run, push admin user/email/password from the Secret into wp_users (idempotent). Use with rotation tooling.
+## @param siteInstall.skipEmail Pass --skip-email to wp core install (avoid first-login email)
+## @param siteInstall.backoffLimit Job backoffLimit (retries before failure)
+## @param siteInstall.activeDeadlineSeconds Hard deadline for the install Job
+##
+siteInstall:
+  enabled: true
+  title: "FrankenPress site"
+  adminUser: "admin"
+  adminEmail: "admin@example.com"
+  adminPassword: ""
+  autoGenerate: true
+  existingSecret: ""
+  existingSecretAdminUserKey: "admin_user"
+  existingSecretAdminEmailKey: "admin_email"
+  existingSecretAdminPasswordKey: "admin_password"
+  syncAdminCredentials: false
+  skipEmail: true
+  backoffLimit: 6
+  activeDeadlineSeconds: 600
+
 ## @section Replicas + scheduling
 
 ## @param replicaCount Number of WP pod replicas

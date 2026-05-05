@@ -1,0 +1,158 @@
+{{- if .Values.siteInstall.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-install" (include "common.names.fullname" .) | trunc 52 | trimSuffix "-" }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    {{- if .Values.commonAnnotations }}
+    {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+    {{- end }}
+spec:
+  backoffLimit: {{ .Values.siteInstall.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.siteInstall.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "fp-site.serviceAccountName" . }}
+      {{- if .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- range .Values.image.pullSecrets }}
+        - name: {{ . }}
+        {{- end }}
+      {{- end }}
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: install
+          image: {{ include "fp-site.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              WP="wp --allow-root --path=/app/web/wp"
+
+              echo "[install] waiting for database..."
+              for i in $(seq 1 60); do
+                if $WP db check >/dev/null 2>&1; then
+                  echo "[install] db ready"
+                  break
+                fi
+                sleep 2
+              done
+
+              if ! $WP core is-installed >/dev/null 2>&1; then
+                echo "[install] running wp core install"
+                $WP core install \
+                  --url="$WP_HOME" \
+                  --title="$SITE_TITLE" \
+                  --admin_user="$ADMIN_USER" \
+                  --admin_email="$ADMIN_EMAIL" \
+                  --admin_password="$ADMIN_PASSWORD" \
+                  {{- if .Values.siteInstall.skipEmail }}
+                  --skip-email
+                  {{- end }}
+              else
+                echo "[install] core already installed; skipping"
+              fi
+
+              echo "[install] running core update-db (idempotent)"
+              $WP core update-db
+
+              if [ "${SYNC_ADMIN_CREDENTIALS:-false}" = "true" ]; then
+                echo "[install] syncing admin credentials from Secret"
+                if $WP user get "$ADMIN_EMAIL" --field=ID >/dev/null 2>&1; then
+                  TARGET="$ADMIN_EMAIL"
+                else
+                  TARGET="$ADMIN_USER"
+                fi
+                # `wp user update` triggers WP's password-change notification.
+                # The site image has no MTA so you'll see a benign
+                # "sendmail: not found" line — the update itself still
+                # returns 0 and the password is applied.
+                $WP user update "$TARGET" \
+                  --user_pass="$ADMIN_PASSWORD" \
+                  --user_email="$ADMIN_EMAIL"
+              fi
+
+              echo "[install] done"
+          envFrom:
+            - configMapRef:
+                name: {{ printf "%s-env" (include "common.names.fullname" .) }}
+            {{- if .Values.extraEnvVarsCM }}
+            - configMapRef:
+                name: {{ tpl .Values.extraEnvVarsCM . }}
+            {{- end }}
+            {{- if .Values.extraEnvVarsSecret }}
+            - secretRef:
+                name: {{ tpl .Values.extraEnvVarsSecret . }}
+            {{- end }}
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fp-site.databaseSecretName" . }}
+                  key: {{ include "fp-site.databaseSecretPasswordKey" . }}
+            - name: FP_S3_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fp-site.s3SecretName" . }}
+                  key: {{ include "fp-site.s3AccessKeyKey" . }}
+            - name: FP_S3_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fp-site.s3SecretName" . }}
+                  key: {{ include "fp-site.s3SecretKeyKey" . }}
+            {{- range $name := list "AUTH_KEY" "SECURE_AUTH_KEY" "LOGGED_IN_KEY" "NONCE_KEY" "AUTH_SALT" "SECURE_AUTH_SALT" "LOGGED_IN_SALT" "NONCE_SALT" }}
+            - name: {{ $name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fp-site.secretName" $ }}
+                  key: {{ $name }}
+            {{- end }}
+            - name: SITE_TITLE
+              value: {{ .Values.siteInstall.title | quote }}
+            - name: ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fp-site.siteInstallSecretName" . }}
+                  key: {{ include "fp-site.siteInstallAdminUserKey" . }}
+            - name: ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fp-site.siteInstallSecretName" . }}
+                  key: {{ include "fp-site.siteInstallAdminEmailKey" . }}
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fp-site.siteInstallSecretName" . }}
+                  key: {{ include "fp-site.siteInstallAdminPasswordKey" . }}
+            - name: SYNC_ADMIN_CREDENTIALS
+              value: {{ .Values.siteInstall.syncAdminCredentials | quote }}
+            {{- if .Values.extraEnvVars }}
+            {{- include "common.tplvalues.render" ( dict "value" .Values.extraEnvVars "context" $ ) | nindent 12 }}
+            {{- end }}
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.tmpfsSize.tmp }}
+        - name: data
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.tmpfsSize.data }}
+{{- end }}

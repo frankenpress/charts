@@ -27,6 +27,41 @@ Name of the keys+salts Secret. Auto-generated default, or an existing one.
 {{- end -}}
 
 {{/*
+Name of the Secret carrying admin install credentials (auto-generated
+default, or an existing one provided by the operator).
+*/}}
+{{- define "fp-site.siteInstallSecretName" -}}
+{{- if .Values.siteInstall.existingSecret -}}
+{{ tpl .Values.siteInstall.existingSecret . }}
+{{- else -}}
+{{ printf "%s-install" (include "common.names.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Key inside the install Secret holding the admin username. Auto-generated
+Secrets always use the canonical `admin_user`; existing Secrets use the
+configured key.
+*/}}
+{{- define "fp-site.siteInstallAdminUserKey" -}}
+{{- if .Values.siteInstall.existingSecret -}}
+{{ .Values.siteInstall.existingSecretAdminUserKey | default "admin_user" }}
+{{- else -}}admin_user{{- end -}}
+{{- end -}}
+
+{{- define "fp-site.siteInstallAdminEmailKey" -}}
+{{- if .Values.siteInstall.existingSecret -}}
+{{ .Values.siteInstall.existingSecretAdminEmailKey | default "admin_email" }}
+{{- else -}}admin_email{{- end -}}
+{{- end -}}
+
+{{- define "fp-site.siteInstallAdminPasswordKey" -}}
+{{- if .Values.siteInstall.existingSecret -}}
+{{ .Values.siteInstall.existingSecretAdminPasswordKey | default "admin_password" }}
+{{- else -}}admin_password{{- end -}}
+{{- end -}}
+
+{{/*
 Database host. When the in-chart MariaDB subchart is enabled, the
 `<release>-mariadb` service is the canonical Service name for bitnami/mariadb
 (the subchart's own `common.names.fullname` produces `<release>-mariadb`,
