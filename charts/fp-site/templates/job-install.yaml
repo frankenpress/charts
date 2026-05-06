@@ -40,20 +40,33 @@ spec:
               set -eu
               WP="wp --allow-root --path=/app/web/wp"
 
-              # `wp db size` uses PHP mysqli directly — works without
-              # the `mysql` / `mysqlcheck` client binaries (the runtime
-              # image doesn't ship them) and doesn't require WP to be
-              # installed. Just probes that we can reach the DB.
+              # Direct mysqli probe — doesn't load WordPress, so it works
+              # before `wp core install` has created wp_options. (`wp db *`
+              # commands all bootstrap WP first and hard-fail with "site
+              # not installed" on a fresh DB. `wp db check` also shells
+              # out to `mysqlcheck` which isn't in the runtime image.)
+              db_ready() {
+                php -r '
+                  $m = @new mysqli(
+                    getenv("DB_HOST"),
+                    getenv("DB_USER"),
+                    getenv("DB_PASSWORD")
+                  );
+                  if ($m->connect_errno) { exit(1); }
+                  $m->close();
+                ' >/dev/null 2>&1
+              }
+
               echo "[install] waiting for database..."
               for i in $(seq 1 60); do
-                if $WP db size >/dev/null 2>&1; then
+                if db_ready; then
                   echo "[install] db ready (iter=$i)"
                   break
                 fi
                 sleep 2
               done
               # Fail fast if the wait loop never saw a healthy DB.
-              $WP db size >/dev/null 2>&1 || {
+              db_ready || {
                 echo "[install] database never became reachable; aborting"
                 exit 1
               }
