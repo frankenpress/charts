@@ -137,6 +137,16 @@ updateStrategy:
 ## @param priorityClassName Pod priority class name
 ##
 podLabels: {}
+## Caddy emits JSON access logs to stdout on the public port; PHP/WP errors
+## go to stderr. Cluster-side shippers (Vector, Grafana Alloy, Fluent Bit)
+## tail container streams without any pod-level config. Datadog Agent's
+## log autodiscovery uses pod annotations — example for the `site` container:
+##
+##   podAnnotations:
+##     ad.datadoghq.com/site.logs: |
+##       [{"source": "caddy", "service": "fp-site"}]
+##
+## Full integration guide: https://docs.frankenpress.com/operations/logging
 podAnnotations: {}
 nodeSelector: {}
 tolerations: []
