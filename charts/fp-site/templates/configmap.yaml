@@ -23,6 +23,12 @@ data:
   {{- if and (not .Values.minio.enabled) .Values.externalS3.bucketUrl }}
   FP_S3_BUCKET_URL: {{ .Values.externalS3.bucketUrl | quote }}
   {{- end }}
+  {{- if .Values.externalS3.objectAcl }}
+  # Only emitted when the user opts in. Unset = mu-plugin sends no
+  # ACL header on PUT (correct default for "Bucket owner enforced"
+  # buckets, which is the AWS new-bucket default since April 2023).
+  FP_S3_OBJECT_ACL: {{ .Values.externalS3.objectAcl | quote }}
+  {{- end }}
   FP_PORT: "8080"
   FP_METRICS_PORT: "9145"
   DISABLE_WP_CRON: "true"

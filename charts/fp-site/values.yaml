@@ -479,6 +479,7 @@ minio:
 ## @param externalS3.region S3 region
 ## @param externalS3.endpoint Custom endpoint URL (leave empty for AWS S3; set for R2 / GCS XML / MinIO)
 ## @param externalS3.bucketUrl Public URL clients use to fetch media (CDN URL or bucket URL)
+## @param externalS3.objectAcl S3 object ACL applied on PUT (`public-read`, `private`, `authenticated-read`). Leave empty for buckets with Object Ownership = "Bucket owner enforced" (the AWS default for new buckets since April 2023). Sending an ACL on such a bucket aborts uploads mid-PUT and leaves 0-byte objects behind.
 ## @param externalS3.accessKey Access key id (or use existingSecret)
 ## @param externalS3.secretKey Secret access key (or use existingSecret)
 ## @param externalS3.existingSecret Pre-existing Secret with `access-key` and `secret-key` keys
@@ -488,6 +489,7 @@ externalS3:
   region: us-east-1
   endpoint: ""
   bucketUrl: ""
+  objectAcl: ""
   accessKey: ""
   secretKey: ""
   existingSecret: ""
