@@ -172,6 +172,32 @@ Name of the Secret holding S3 access keys.
 {{- end -}}
 
 {{/*
+SMTP env entries from a Secret.
+
+When `smtp.enabled=true` AND `smtp.auth.existingSecret` is set, emit the
+two `secretKeyRef` env entries. Used identically by the Deployment, the
+wpcron CronJob, and the install Job — keeps the three workloads in sync.
+
+When `smtp.enabled=false`, this expands to nothing — `FP_SMTP_HOST`
+isn't injected by the configmap either, so the SMTPMailer mu-plugin
+component sees no host and is a silent no-op.
+*/}}
+{{- define "fp-site.smtpEnvFromSecret" -}}
+{{- if and .Values.smtp.enabled .Values.smtp.auth.existingSecret }}
+- name: FP_SMTP_USERNAME
+  valueFrom:
+    secretKeyRef:
+      name: {{ tpl .Values.smtp.auth.existingSecret . }}
+      key: {{ .Values.smtp.auth.usernameKey | default "username" }}
+- name: FP_SMTP_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ tpl .Values.smtp.auth.existingSecret . }}
+      key: {{ .Values.smtp.auth.passwordKey | default "password" }}
+{{- end }}
+{{- end -}}
+
+{{/*
 ServiceAccount name.
 */}}
 {{- define "fp-site.serviceAccountName" -}}

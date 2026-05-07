@@ -106,6 +106,7 @@ spec:
                   name: {{ include "fp-site.secretName" $ }}
                   key: {{ $name }}
             {{- end }}
+            {{- include "fp-site.smtpEnvFromSecret" . | nindent 12 }}
             {{- if .Values.extraEnvVars }}
             {{- include "common.tplvalues.render" ( dict "value" .Values.extraEnvVars "context" $ ) | nindent 12 }}
             {{- end }}
