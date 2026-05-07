@@ -5,10 +5,10 @@ type: application
 icon: https://eightoeight.io/icon.png
 
 # Chart version. Bumped on every change to templates / values / Chart.yaml.
-version: 0.2.5
+version: 0.2.6
 
 # Application version. Tracks the fp-site-template release we test against.
-appVersion: "0.2.2"
+appVersion: "0.2.3"
 
 kubeVersion: ">=1.27.0-0"
 

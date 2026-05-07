@@ -328,7 +328,7 @@ autoscaling:
 
 ## @section wp-cron CronJob
 
-## @param wpCron.enabled Enable WP cron CronJob (recommended; disable WP's request-triggered cron with DISABLE_WP_CRON=true)
+## @param wpCron.enabled Enable the WP cron CronJob. When true, the chart also sets DISABLE_WP_CRON=true on the site so the in-process pseudo-cron doesn't fire alongside it (the two settings are coupled). Disable to fall back to WP's request-triggered cron.
 ## @param wpCron.schedule Cron schedule
 ## @param wpCron.successfulJobsHistoryLimit Number of successful job pods to retain
 ## @param wpCron.failedJobsHistoryLimit Number of failed job pods to retain

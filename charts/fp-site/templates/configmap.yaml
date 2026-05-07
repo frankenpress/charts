@@ -31,4 +31,8 @@ data:
   {{- end }}
   FP_PORT: "8080"
   FP_METRICS_PORT: "9145"
-  DISABLE_WP_CRON: "true"
+  # When the wpCron CronJob is enabled, disable WP's in-process pseudo-cron
+  # so the two don't fire concurrently. Flipping wpCron.enabled to false
+  # automatically re-enables in-process cron — a site without either driver
+  # would never run scheduled events.
+  DISABLE_WP_CRON: {{ .Values.wpCron.enabled | quote }}
