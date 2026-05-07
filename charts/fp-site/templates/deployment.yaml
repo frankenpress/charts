@@ -151,10 +151,15 @@ spec:
               if [ -n "${FP_SMTP_HOST:-}" ]; then
                 REQUIRE_FLAG=""
               else
+                # `--require=` files are loaded during wp-cli bootstrap,
+                # before WordPress — so `add_filter` isn't defined yet.
+                # Defer registration via `WP_CLI::add_hook('after_wp_load', ...)`.
                 cat > /tmp/no-user-emails.php <<'PHP'
               <?php
-              add_filter( 'send_password_change_email', '__return_false' );
-              add_filter( 'send_email_change_email',    '__return_false' );
+              WP_CLI::add_hook( 'after_wp_load', function() {
+                  add_filter( 'send_password_change_email', '__return_false' );
+                  add_filter( 'send_email_change_email',    '__return_false' );
+              });
               PHP
                 REQUIRE_FLAG="--require=/tmp/no-user-emails.php"
               fi
