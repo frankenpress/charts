@@ -145,6 +145,7 @@ syncAdminCredentials: true
 ## @param updateStrategy.type Site deployment update strategy
 ## @param updateStrategy.rollingUpdate.maxSurge Max surge during rolling update
 ## @param updateStrategy.rollingUpdate.maxUnavailable Max unavailable during rolling update
+## @param revisionHistoryLimit Old ReplicaSets to retain for `kubectl rollout undo`. Default 3 (current + 2 previous). The k8s default of 10 leaves a long tail of zero-replica ReplicaSets in long-lived namespaces. `helm rollback` and image-tag-pinned re-deploys are the canonical rollback paths in this stack, so a deeper k8s-side history isn't load-bearing.
 ##
 replicaCount: 1
 updateStrategy:
@@ -152,6 +153,7 @@ updateStrategy:
   rollingUpdate:
     maxSurge: 1
     maxUnavailable: 0
+revisionHistoryLimit: 3
 
 ## @param podLabels Extra labels for the site pods
 ## @param podAnnotations Extra annotations for the site pods
