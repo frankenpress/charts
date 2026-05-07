@@ -52,6 +52,181 @@ spec:
       topologySpreadConstraints: {{- toYaml .Values.topologySpreadConstraints | nindent 8 }}
       {{- end }}
       securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if and .Values.syncAdminCredentials .Values.siteInstall.enabled }}
+      initContainers:
+        # Reconciles wp_users with the admin credentials Secret on every
+        # Pod start. Pair with stakater/Reloader (or any controller that
+        # rolls the Deployment when the Secret changes) so credential
+        # rotation is self-driving end-to-end. Idempotent — see the
+        # `syncAdminCredentials` block in values.yaml.
+        - name: sync-admin-credentials
+          image: {{ include "fp-site.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              WP="wp --allow-root --path=/app/web/wp"
+
+              # Direct mysqli probe — doesn't load WordPress, so it works
+              # before `wp core install` has created wp_options on a
+              # fresh deploy. (Same probe as job-install.yaml.)
+              db_ready() {
+                php -r '
+                  $m = @new mysqli(
+                    getenv("DB_HOST"),
+                    getenv("DB_USER"),
+                    getenv("DB_PASSWORD")
+                  );
+                  if ($m->connect_errno) { exit(1); }
+                  $m->close();
+                ' >/dev/null 2>&1
+              }
+
+              echo "[sync-creds] waiting for database..."
+              for i in $(seq 1 60); do
+                if db_ready; then
+                  echo "[sync-creds] db ready (iter=$i)"
+                  break
+                fi
+                sleep 2
+              done
+              db_ready || {
+                echo "[sync-creds] database never became reachable; aborting"
+                exit 1
+              }
+
+              # Fresh deploy: WP isn't installed yet. The post-install
+              # Helm hook Job creates the admin user with the same Secret
+              # we'd be syncing from, so there's nothing to reconcile.
+              if ! $WP core is-installed >/dev/null 2>&1; then
+                echo "[sync-creds] WP not yet installed; skipping (post-install Job will bootstrap)"
+                exit 0
+              fi
+
+              # Resolve the user we're targeting. Prefer matching by
+              # email (survives username changes); fall back to username.
+              if $WP user get "$ADMIN_EMAIL" --field=ID >/dev/null 2>&1; then
+                TARGET="$ADMIN_EMAIL"
+              elif $WP user get "$ADMIN_USER" --field=ID >/dev/null 2>&1; then
+                TARGET="$ADMIN_USER"
+              else
+                echo "[sync-creds] neither ADMIN_EMAIL nor ADMIN_USER resolves to an existing user; aborting"
+                exit 1
+              fi
+
+              # Idempotency check: compare desired creds against current
+              # DB state. With N>1 replicas under the default rolling
+              # update (maxSurge:1, maxUnavailable:0), the first Pod to
+              # roll wins the write; subsequent Pods see DB-in-sync here
+              # and short-circuit. WP fires at most one "Password
+              # Changed" notification per rotation.
+              DRIFT=$($WP eval '
+                $u = get_user_by( "email", getenv("ADMIN_EMAIL") );
+                if ( ! $u ) { $u = get_user_by( "login", getenv("ADMIN_USER") ); }
+                if ( ! $u ) { echo "drift"; return; }
+                $pw_match    = wp_check_password( getenv("ADMIN_PASSWORD"), $u->user_pass, $u->ID );
+                $email_match = ( $u->user_email === getenv("ADMIN_EMAIL") );
+                $login_match = ( $u->user_login === getenv("ADMIN_USER") );
+                echo ( $pw_match && $email_match && $login_match ) ? "match" : "drift";
+              ' 2>/dev/null) || DRIFT="drift"
+
+              if [ "$DRIFT" = "match" ]; then
+                echo "[sync-creds] DB already in sync with Secret; skipping update"
+                exit 0
+              fi
+
+              echo "[sync-creds] credential drift detected; running wp user update"
+
+              # `wp user update` triggers WP's password-change notification.
+              # When SMTP is configured (FP_SMTP_HOST set), the email
+              # actually delivers via the configured server. When it
+              # isn't, we drop a tiny filter file and pass --require=
+              # to suppress the email entirely — otherwise WP falls
+              # through to mail() → /usr/sbin/sendmail (absent in the
+              # runtime image) and emits a noisy "sendmail: not found"
+              # line on every credential sync.
+              if [ -n "${FP_SMTP_HOST:-}" ]; then
+                REQUIRE_FLAG=""
+              else
+                cat > /tmp/no-user-emails.php <<'PHP'
+              <?php
+              add_filter( 'send_password_change_email', '__return_false' );
+              add_filter( 'send_email_change_email',    '__return_false' );
+              PHP
+                REQUIRE_FLAG="--require=/tmp/no-user-emails.php"
+              fi
+
+              # shellcheck disable=SC2086 -- intentional word-split on REQUIRE_FLAG
+              $WP $REQUIRE_FLAG user update "$TARGET" \
+                --user_pass="$ADMIN_PASSWORD" \
+                --user_email="$ADMIN_EMAIL"
+
+              echo "[sync-creds] done"
+          envFrom:
+            - configMapRef:
+                name: {{ printf "%s-env" (include "common.names.fullname" .) }}
+            {{- if .Values.extraEnvVarsCM }}
+            - configMapRef:
+                name: {{ tpl .Values.extraEnvVarsCM . }}
+            {{- end }}
+            {{- if .Values.extraEnvVarsSecret }}
+            - secretRef:
+                name: {{ tpl .Values.extraEnvVarsSecret . }}
+            {{- end }}
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fp-site.databaseSecretName" . }}
+                  key: {{ include "fp-site.databaseSecretPasswordKey" . }}
+            - name: FP_S3_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fp-site.s3SecretName" . }}
+                  key: {{ include "fp-site.s3AccessKeyKey" . }}
+            - name: FP_S3_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fp-site.s3SecretName" . }}
+                  key: {{ include "fp-site.s3SecretKeyKey" . }}
+            {{- range $name := list "AUTH_KEY" "SECURE_AUTH_KEY" "LOGGED_IN_KEY" "NONCE_KEY" "AUTH_SALT" "SECURE_AUTH_SALT" "LOGGED_IN_SALT" "NONCE_SALT" }}
+            - name: {{ $name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fp-site.secretName" $ }}
+                  key: {{ $name }}
+            {{- end }}
+            - name: ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fp-site.siteInstallSecretName" . }}
+                  key: {{ include "fp-site.siteInstallAdminUserKey" . }}
+            - name: ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fp-site.siteInstallSecretName" . }}
+                  key: {{ include "fp-site.siteInstallAdminEmailKey" . }}
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fp-site.siteInstallSecretName" . }}
+                  key: {{ include "fp-site.siteInstallAdminPasswordKey" . }}
+            {{- include "fp-site.smtpEnvFromSecret" . | nindent 12 }}
+            {{- if .Values.extraEnvVars }}
+            {{- include "common.tplvalues.render" ( dict "value" .Values.extraEnvVars "context" $ ) | nindent 12 }}
+            {{- end }}
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: data
+              mountPath: /data
+            - name: config
+              mountPath: /config
+      {{- end }}
       containers:
         - name: site
           image: {{ include "fp-site.image" . }}

@@ -78,10 +78,10 @@ keysSalts:
 ## A post-install/post-upgrade Helm hook Job runs `wp core install`
 ## (idempotent via `wp core is-installed`) and `wp core update-db`. Admin
 ## credentials come from an auto-generated Secret unless `existingSecret`
-## is set. When `syncAdminCredentials: true`, every post-upgrade run
-## reconciles wp_users to match the Secret — useful when an external
-## system (External Secrets Operator, Sealed Secrets, manual rotation)
-## is the source of truth for the admin password.
+## is set. Reconciling wp_users on rotation is handled separately by the
+## `syncAdminCredentials` initContainer on the Deployment (see below) —
+## that path is Pod-lifecycle-driven, so Reloader rolling on a Secret
+## change naturally re-syncs without needing a Helm upgrade.
 
 ## @param siteInstall.enabled Run wp core install on first deploy
 ## @param siteInstall.title Site title shown in wp-admin
@@ -93,7 +93,6 @@ keysSalts:
 ## @param siteInstall.existingSecretAdminUserKey Key in existingSecret holding the admin username
 ## @param siteInstall.existingSecretAdminEmailKey Key in existingSecret holding the admin email
 ## @param siteInstall.existingSecretAdminPasswordKey Key in existingSecret holding the admin password
-## @param siteInstall.syncAdminCredentials On every post-upgrade run, push admin user/email/password from the Secret into wp_users (idempotent). Use with rotation tooling.
 ## @param siteInstall.skipEmail Pass --skip-email to wp core install (avoid first-login email)
 ## @param siteInstall.backoffLimit Job backoffLimit (retries before failure)
 ## @param siteInstall.activeDeadlineSeconds Hard deadline for the install Job
@@ -109,10 +108,36 @@ siteInstall:
   existingSecretAdminUserKey: "admin_user"
   existingSecretAdminEmailKey: "admin_email"
   existingSecretAdminPasswordKey: "admin_password"
-  syncAdminCredentials: false
   skipEmail: true
   backoffLimit: 6
   activeDeadlineSeconds: 600
+
+## @section Admin credential sync (rotation)
+## An initContainer on every site Pod that reads admin user/email/password
+## from the install Secret and reconciles wp_users to match. Combined with
+## a controller that rolls the Deployment when the Secret changes (e.g.
+## stakater/Reloader watching the auto-generated `<release>-fp-site-install`
+## Secret, or a user-supplied `existingSecret`), credential rotation
+## becomes self-driving end-to-end:
+##
+##   external rotation → Secret updated → Reloader rolls Deployment →
+##     initContainer detects drift → wp user update → DB in sync
+##
+## The initContainer is idempotent: it short-circuits when the DB hash
+## already matches the Secret value (via `wp_check_password`) and the
+## stored email already matches. With N>1 replicas under the default
+## rolling update, only the first Pod to roll runs `wp user update` —
+## subsequent Pods see the DB in sync and exit early, so a single
+## rotation produces at most one DB write and at most one WP-emitted
+## "Password Changed" notification.
+##
+## The first-install path is unaffected: `wp core install` still runs in
+## the post-install Helm hook Job and is the only place the initial
+## admin user is created.
+
+## @param syncAdminCredentials Run an initContainer on every site Pod that syncs admin_user/admin_email/admin_password from the install Secret into wp_users. Idempotent — only writes on drift, so multi-replica rollouts don't fire duplicate change notifications. Set false to manage the WP admin user out-of-band.
+##
+syncAdminCredentials: true
 
 ## @section Replicas + scheduling
 
@@ -321,10 +346,11 @@ serviceAccount:
 ## Postmark, SendGrid, Mailgun, AWS SES, in-cluster relay, etc.
 ##
 ## When `smtp.enabled=false` (default), no `FP_SMTP_*` env is injected
-## and the install Job suppresses WordPress's password-change email
-## (which would otherwise emit a benign-but-noisy "sendmail: not found"
-## line on the syncAdminCredentials path). When `smtp.enabled=true`,
-## the install Job's email actually delivers via the configured server.
+## and the syncAdminCredentials initContainer suppresses WordPress's
+## password-change email (which would otherwise emit a benign-but-noisy
+## "sendmail: not found" line on every credential sync). When
+## `smtp.enabled=true`, the change notification actually delivers via
+## the configured server.
 
 ## @param smtp.enabled Wire SMTP into wp_mail(). Requires `smtp.host` and `smtp.auth.existingSecret`. Sites built from `fp-site-template` v0.2.4+ honour this; older images ignore it.
 ## @param smtp.host SMTP server hostname (e.g. `smtp.postmarkapp.com`)
