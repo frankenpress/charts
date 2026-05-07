@@ -36,3 +36,19 @@ data:
   # automatically re-enables in-process cron — a site without either driver
   # would never run scheduled events.
   DISABLE_WP_CRON: {{ .Values.wpCron.enabled | quote }}
+  {{- if .Values.smtp.enabled }}
+  # SMTP — consumed by the SMTPMailer mu-plugin component
+  # (fp-mu-plugin >=0.5.0). USERNAME / PASSWORD live in
+  # `smtp.auth.existingSecret` and are injected into the Deployment,
+  # wpcron CronJob, and install Job via secretKeyRef (see
+  # `fp-site.smtpEnvFromSecret` helper).
+  FP_SMTP_HOST: {{ .Values.smtp.host | quote }}
+  FP_SMTP_PORT: {{ .Values.smtp.port | quote }}
+  FP_SMTP_ENCRYPTION: {{ .Values.smtp.encryption | quote }}
+  {{- if .Values.smtp.fromEmail }}
+  FP_SMTP_FROM_EMAIL: {{ .Values.smtp.fromEmail | quote }}
+  {{- end }}
+  {{- if .Values.smtp.fromName }}
+  FP_SMTP_FROM_NAME: {{ .Values.smtp.fromName | quote }}
+  {{- end }}
+  {{- end }}

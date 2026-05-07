@@ -311,6 +311,43 @@ serviceAccount:
   annotations: {}
   automountServiceAccountToken: false
 
+## @section SMTP (optional, transport-agnostic mail delivery)
+##
+## The fp-runtime image ships no MTA, so PHP's `mail()` fails silently
+## and `wp_mail()` returns true while no email actually delivers. Set
+## `smtp.enabled=true` and provide a Secret containing SMTP auth
+## credentials to wire the global PHPMailer (via the SMTPMailer mu-plugin
+## component, fp-mu-plugin >=0.5.0) to send through any SMTP server —
+## Postmark, SendGrid, Mailgun, AWS SES, in-cluster relay, etc.
+##
+## When `smtp.enabled=false` (default), no `FP_SMTP_*` env is injected
+## and the install Job suppresses WordPress's password-change email
+## (which would otherwise emit a benign-but-noisy "sendmail: not found"
+## line on the syncAdminCredentials path). When `smtp.enabled=true`,
+## the install Job's email actually delivers via the configured server.
+
+## @param smtp.enabled Wire SMTP into wp_mail(). Requires `smtp.host` and `smtp.auth.existingSecret`. Sites built from `fp-site-template` v0.2.4+ honour this; older images ignore it.
+## @param smtp.host SMTP server hostname (e.g. `smtp.postmarkapp.com`)
+## @param smtp.port TCP port (587 STARTTLS, 465 implicit TLS, 25 plaintext — don't)
+## @param smtp.encryption `tls` (STARTTLS), `ssl` (implicit TLS), `none` (local dev only)
+## @param smtp.fromEmail `wp_mail_from` filter target. Empty → WP `admin_email` option.
+## @param smtp.fromName `wp_mail_from_name` filter target. Empty → WP `blogname` option.
+## @param smtp.auth.existingSecret Name of a Secret holding SMTP `username` and `password`. Required when `smtp.enabled=true`.
+## @param smtp.auth.usernameKey Key inside the Secret for the SMTP username
+## @param smtp.auth.passwordKey Key inside the Secret for the SMTP password
+##
+smtp:
+  enabled: false
+  host: ""
+  port: 587
+  encryption: tls
+  fromEmail: ""
+  fromName: ""
+  auth:
+    existingSecret: ""
+    usernameKey: username
+    passwordKey: password
+
 ## @section ServiceMonitor (optional, prometheus-operator)
 
 ## @param serviceMonitor.enabled Render a ServiceMonitor for prometheus-operator. Requires the `monitoring.coreos.com/v1` CRD on the cluster — the template self-gates on `Capabilities.APIVersions`, so leaving this on for clusters without the CRD is safe but renders nothing.
