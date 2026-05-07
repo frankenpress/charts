@@ -211,9 +211,12 @@ rotation is self-driving end-to-end:
 
 ```yaml
 # Annotate the Deployment so Reloader watches the install Secret and
-# rolls the Pods when its contents change. (For an auto-generated
-# Secret, the name is `<release>-fp-site-install`.)
-podAnnotations:
+# rolls the Pods when its contents change. Use `commonAnnotations`
+# (lands on the Deployment's metadata.annotations, which is what
+# Reloader watches), NOT `podAnnotations` (lands on the pod-template).
+# For an auto-generated install Secret, the name is
+# `<release>-fp-site-install`.
+commonAnnotations:
   secret.reloader.stakater.com/reload: "mysite-fp-site-install"
 ```
 
