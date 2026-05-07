@@ -29,13 +29,21 @@ spec:
               imagePullPolicy: {{ .Values.image.pullPolicy }}
               securityContext: {{- toYaml .Values.containerSecurityContext | nindent 16 }}
               command:
-                - wp
-                - --allow-root
-                - --path=/app/web/wp
-                - cron
-                - event
-                - run
-                - --due-now
+                - /bin/sh
+                - -c
+                - |
+                  set -eu
+                  WP="wp --allow-root --path=/app/web/wp"
+                  # Skip cycles that fire before `wp core install` has
+                  # populated wp_options (post-install Helm hook hasn't
+                  # run yet, or operator has paused the deployment).
+                  # Erroring out on every fire would accumulate
+                  # restarts + clutter logs without doing useful work.
+                  if ! $WP core is-installed >/dev/null 2>&1; then
+                    echo "[wpcron] WP not yet installed; skipping this cycle"
+                    exit 0
+                  fi
+                  exec $WP cron event run --due-now
               envFrom:
                 - configMapRef:
                     name: {{ printf "%s-env" (include "common.names.fullname" .) }}

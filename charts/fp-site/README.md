@@ -202,18 +202,44 @@ siteInstall:
 
 **Admin password.** WordPress stores a *hash* of the password in
 `wp_users`, so changing the Secret value alone won't update the live
-login. Set `siteInstall.syncAdminCredentials: true` and the
-post-upgrade Job will run `wp user update` to push the Secret value
-into the DB on every release:
+login. The chart ships with `syncAdminCredentials: true` by default —
+an initContainer on every site Pod that reads the install Secret and
+runs `wp user update` when the DB has drifted from it. Pair with a
+controller that rolls the Deployment when the Secret changes (e.g.
+[stakater/Reloader](https://github.com/stakater/Reloader)) and
+rotation is self-driving end-to-end:
+
+```yaml
+# Annotate the Deployment so Reloader watches the install Secret and
+# rolls the Pods when its contents change. Use `commonAnnotations`
+# (lands on the Deployment's metadata.annotations, which is what
+# Reloader watches), NOT `podAnnotations` (lands on the pod-template).
+# For an auto-generated install Secret, the name is
+# `<release>-fp-site-install`.
+commonAnnotations:
+  secret.reloader.stakater.com/reload: "mysite-fp-site-install"
+```
 
 ```bash
 # Whatever rotates your Secret (manual edit, ESO sync from cloud
 # secrets manager, sealed-secret rotation, etc.) updates the value:
-kubectl patch secret mysite-admin -p '{"stringData":{"admin_password":"new-value"}}'
+kubectl patch secret mysite-fp-site-install \
+  -p '{"stringData":{"admin_password":"new-value"}}'
 
-# Trigger the post-upgrade Job:
-helm upgrade mysite oci://ghcr.io/eightoeight/charts/fp-site --reuse-values
+# Reloader rolls the Deployment → initContainer detects drift →
+# wp user update runs → DB caught up to Secret. No `helm upgrade`
+# required.
 ```
+
+The initContainer is idempotent: it short-circuits when the DB hash
+already matches the Secret (via `wp_check_password`). With multiple
+replicas under the default rolling update strategy, only the first
+Pod to roll runs the update — subsequent Pods see the DB in sync and
+exit early, so a single rotation produces at most one DB write and at
+most one WP-emitted "Password Changed" notification.
+
+Set `syncAdminCredentials: false` to skip the initContainer entirely
+(e.g. when an external IdP owns the WP admin user).
 
 **Database password.** The Deployment, wpcron CronJob, and install Job
 all read `DB_PASSWORD` from `secretKeyRef`. When the Secret value
