@@ -311,6 +311,21 @@ serviceAccount:
   annotations: {}
   automountServiceAccountToken: false
 
+## @section ServiceMonitor (optional, prometheus-operator)
+
+## @param serviceMonitor.enabled Render a ServiceMonitor for prometheus-operator. Requires the `monitoring.coreos.com/v1` CRD on the cluster — the template self-gates on `Capabilities.APIVersions`, so leaving this on for clusters without the CRD is safe but renders nothing.
+## @param serviceMonitor.namespace Namespace for the ServiceMonitor (defaults to the release namespace)
+## @param serviceMonitor.interval Scrape interval
+## @param serviceMonitor.scrapeTimeout Per-scrape timeout
+## @param serviceMonitor.labels Extra labels for the ServiceMonitor (used by your Prometheus operator's `serviceMonitorSelector`)
+##
+serviceMonitor:
+  enabled: false
+  namespace: ""
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+
 ## @section Horizontal Pod Autoscaling (optional)
 
 ## @param autoscaling.enabled Enable HPA
