@@ -1,0 +1,38 @@
+name: e2e
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lockdown:
+    name: lockdown negative-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.18.0
+
+      - name: kind cluster
+        uses: helm/kind-action@v1.12.0
+        with:
+          cluster_name: e2e
+
+      - name: lockdown-test
+        env:
+          KUBE_CONTEXT: kind-e2e
+          # Pulls the published site image — a regression in the image
+          # itself (e.g. AUTOMATIC_UPDATER_DISABLED accidentally relaxed
+          # in fp-site-template) is exactly what this test catches.
+          IMAGE_REGISTRY: ghcr.io
+          IMAGE_REPO: eightoeight/fp-site-template
+          IMAGE_TAG: v0.2.3
+          IMAGE_PULL_POLICY: IfNotPresent
+        run: ./tests/lockdown-test.sh
