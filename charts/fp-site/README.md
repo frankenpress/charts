@@ -276,7 +276,7 @@ annotations following the Bitnami chart convention).
 | Repo | Purpose |
 |---|---|
 | [`fp-runtime`](https://github.com/EightOEight/fp-runtime) | Caddy + FrankenPHP + Souin base image |
-| [`fp-mu-plugin`](https://github.com/EightOEight/fp-mu-plugin) | Must-use plugin (S3 bootstrap + Souin invalidator) |
+| [`fp-mu-plugin`](https://github.com/EightOEight/fp-mu-plugin) | Must-use plugin (S3 bootstrap + Souin invalidator + Site Health + SMTP) |
 | [`fp-site-template`](https://github.com/EightOEight/fp-site-template) | GitHub template for new sites — what this chart deploys |
 | [`fp-charts`](https://github.com/EightOEight/fp-charts) (this repo) | Helm charts |
 
