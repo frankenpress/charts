@@ -8,7 +8,7 @@ Guidance for Claude Code when working in this repo.
 which deploys a single FrankenPress WordPress site to Kubernetes.
 
 Charts are published as OCI artifacts on GHCR:
-**`oci://ghcr.io/eightoeight/charts/fp-site`** (current: `0.1.1`).
+**`oci://ghcr.io/eightoeight/charts/fp-site`** (current: `0.5.0`).
 
 Public docs: **<https://docs.frankenpress.com/components/fp-charts>**
 
@@ -17,7 +17,7 @@ Public docs: **<https://docs.frankenpress.com/components/fp-charts>**
 - Every public value in `values.yaml` carries a `## @param <path> <description>` annotation. Bitnami's `readme-generator-for-helm` (and our docs) consume these.
 - Naming/labels/image templating goes through [`bitnami/common`](https://github.com/bitnami/charts/tree/main/bitnami/common) helpers (`common.names.fullname`, `common.labels.standard`, `common.images.image`, `common.tplvalues.render`). Don't reinvent them.
 - Subchart deps via Bitnami's OCI registry: `oci://registry-1.docker.io/bitnamicharts/<name>`.
-- Production-grade `securityContext` defaults (readOnlyRootFilesystem, runAsUser:33, drop:[ALL] + add:[NET_BIND_SERVICE]).
+- Production-grade `securityContext` defaults that satisfy PSA `restricted:latest` out of the box: `readOnlyRootFilesystem`, `runAsUser:33`, `runAsNonRoot:true`, `allowPrivilegeEscalation:false`, `capabilities.drop:[ALL]` (no `add`), pod-level `seccompProfile.type:RuntimeDefault`. Works with the `fp-runtime` v0.1.x line because that runtime ships FrankenPHP with the `cap_net_bind_service` file capability stripped (`setcap -r`); a custom runtime that re-adds the cap needs the chart values overridden — see the comment block above `containerSecurityContext` in `values.yaml`.
 
 ## File layout
 

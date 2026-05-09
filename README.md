@@ -17,7 +17,7 @@ The charts are published as OCI artifacts on GHCR:
 
 ```bash
 helm install mysite oci://ghcr.io/eightoeight/charts/fp-site \
-  --version 0.1.0 \
+  --version 0.5.0 \
   --namespace mysite --create-namespace
 ```
 
