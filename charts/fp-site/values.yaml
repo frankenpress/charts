@@ -233,51 +233,39 @@ readinessProbe:
 ## @param podSecurityContext.runAsNonRoot Run pod as non-root
 ## @param podSecurityContext.runAsUser User ID to run pod as (33 = www-data)
 ## @param podSecurityContext.fsGroup Filesystem group
+## @param podSecurityContext.seccompProfile.type Seccomp profile type (`RuntimeDefault` satisfies PSA `restricted:latest`)
 ##
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 33
   fsGroup: 33
+  seccompProfile:
+    type: RuntimeDefault
 
 ## @param containerSecurityContext.runAsNonRoot Run container as non-root
 ## @param containerSecurityContext.runAsUser User to run container as
 ## @param containerSecurityContext.allowPrivilegeEscalation Allow privilege escalation
 ## @param containerSecurityContext.readOnlyRootFilesystem Read-only root filesystem
 ## @param containerSecurityContext.capabilities.drop Capabilities to drop
-## @param containerSecurityContext.capabilities.add Capabilities to add
 ##
-## Note on `cap_net_bind_service`: the FrankenPHP binary inside fp-runtime
-## ships with `cap_net_bind_service=ep` set on the binary (so it can bind
-## :80 / :443 without root). With strict pod security (drop: [ALL]), the
-## kernel refuses to exec a binary that carries file capabilities — you'd
-## hit `exec: frankenphp: Operation not permitted`.
-##
-## Two ways to harden further:
-##   1. (this chart): keep `add: [NET_BIND_SERVICE]` so the kernel honors
-##      the file cap. Container can bind low ports but nothing else.
-##   2. (fp-runtime): build with `setcap -r /usr/local/bin/frankenphp`
-##      after the COPY step. The binary loses the file cap; we never
-##      bind low ports anyway (FP_PORT defaults to 8080). Then this
-##      chart can flip back to `drop: [ALL]` with no `add:`.
-##
-## Default keeps option 1 so the chart works against fp-runtime today.
-##
-## `allowPrivilegeEscalation` defaults to `true` because the no_new_privs
-## flag (set when this is `false`) makes the kernel refuse to exec a
-## binary that carries file capabilities — and the FrankenPHP binary
-## ships with cap_net_bind_service=ep set. After fp-runtime ships an
-## image with the file cap stripped (`setcap -r`), this can flip back
-## to `false`.
+## These defaults satisfy PodSecurity Standard `restricted:latest` without
+## additional overrides. The pair (`allowPrivilegeEscalation: false`,
+## `capabilities.drop: [ALL]`) is safe because the FrankenPHP binary in
+## fp-runtime ships *without* the `cap_net_bind_service=ep` file capability
+## — stripped by `setcap -r` in fp-runtime's Dockerfile, since `FP_PORT`
+## defaults to 8080 (no low-port bind). If you build a custom runtime image
+## that re-adds the file cap, the kernel's `no_new_privs` flag (set when
+## `allowPrivilegeEscalation: false`) will refuse to exec it. In that case,
+## override in your values: `containerSecurityContext.allowPrivilegeEscalation: true`
+## and `containerSecurityContext.capabilities.add: [NET_BIND_SERVICE]`.
 containerSecurityContext:
   runAsNonRoot: true
   runAsUser: 33
-  allowPrivilegeEscalation: true
+  allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
   capabilities:
     drop:
       - ALL
-    add:
-      - NET_BIND_SERVICE
 
 ## @section Service
 
