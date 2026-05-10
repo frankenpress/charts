@@ -32,7 +32,7 @@ jobs:
           # itself (e.g. AUTOMATIC_UPDATER_DISABLED accidentally relaxed
           # in fp-site-template) is exactly what this test catches.
           IMAGE_REGISTRY: ghcr.io
-          IMAGE_REPO: eightoeight/fp-site-template
-          IMAGE_TAG: v0.2.3
+          IMAGE_REPO: frankenpress/site-template
+          IMAGE_TAG: v0.2.5
           IMAGE_PULL_POLICY: IfNotPresent
         run: ./tests/lockdown-test.sh
