@@ -266,6 +266,37 @@ helm install mysite oci://ghcr.io/frankenpress/charts/site \
 `wp core update-db` won't run either — make sure your dump is
 schema-compatible with the WP core version baked into the site image.
 
+### Post-deploy actions (theme activation + custom wp-cli)
+
+The install Job (which already fires on `post-install` + `post-upgrade`)
+runs two extra steps after `wp core install` / `update-db`:
+
+1. **`siteInstall.activeTheme`** — if set, runs `wp --skip-themes theme activate <slug>`. `--skip-themes` so a previously broken active theme doesn't fatal WP-CLI before the switch lands (the recovery path after a botched paid-theme release).
+2. **`siteInstall.postDeployCommands`** — a list of raw wp-cli sub-commands run in order, each as `wp --path=/app/web/wp <entry>`. Use for theme-specific post-activation hooks the theme itself only fires on admin save (e.g. cached LESS → CSS regen).
+
+Both run on every release — they must be **idempotent**. A non-zero
+exit fails the Job (Helm marks the release failed; `kubectl logs job/<release>-site-install`
+has the output) but the Deployment itself is **not** rolled back —
+the new pod is already serving traffic by then. Treat post-deploy
+failures as fix-forward.
+
+Worked example — paid theme `dt-the7` with The7's dynamic-CSS hash
+that gets stuck if a prior release fataled mid-compile:
+
+```yaml
+siteInstall:
+  activeTheme: dt-the7
+  postDeployCommands:
+    # Force-regen the the7-css/ dynamic stylesheets to S3 / uploads.
+    # The7's own hook updates the gating hash *before* the compile,
+    # so a prior fatal leaves the hash "done" and the next clean
+    # release won't re-fire without this nudge.
+    - 'eval "delete_option(\"the7_last_dynamic_stylesheets_hash\"); the7_maybe_regenerate_dynamic_css();"'
+```
+
+Both values default empty — sites that don't need a theme switch
+or any post-deploy commands pay no extra Job time.
+
 ## Values reference
 
 See `values.yaml` (every parameter is documented inline with `## @param`
