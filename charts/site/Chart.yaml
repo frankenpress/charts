@@ -2,7 +2,7 @@ apiVersion: v2
 name: site
 description: FrankenPress WordPress site — Caddy + FrankenPHP + Souin (HTTP cache) + humanmade/s3-uploads (media offload). Deploys a single site image (built from site-template) plus optional in-cluster MariaDB / Redis / MinIO subcharts for instant on-cluster deployment.
 type: application
-icon: https://eightoeight.io/icon.png
+icon: https://frankenpress.com/icon.png
 
 # Chart version. Bumped on every change to templates / values / Chart.yaml.
 version: 0.5.1
@@ -28,9 +28,9 @@ sources:
   - https://github.com/frankenpress/site-template
 
 maintainers:
-  - name: EightOEight Ltd.
-    email: hello@eightoeight.io
-    url: https://eightoeight.io
+  - name: FrankenPress.
+    email: hello@frankenpress.com
+    url: https://frankenpress.com
 
 annotations:
   # Used by ArtifactHub-style consumers.
