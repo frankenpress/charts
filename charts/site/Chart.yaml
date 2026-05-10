@@ -1,5 +1,5 @@
 apiVersion: v2
-name: fp-site
+name: site
 description: FrankenPress WordPress site — Caddy + FrankenPHP + Souin (HTTP cache) + humanmade/s3-uploads (media offload). Deploys a single site image (built from fp-site-template) plus optional in-cluster MariaDB / Redis / MinIO subcharts for instant on-cluster deployment.
 type: application
 icon: https://eightoeight.io/icon.png
