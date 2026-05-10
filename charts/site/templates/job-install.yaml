@@ -89,6 +89,30 @@ spec:
               echo "[install] running core update-db (idempotent)"
               $WP core update-db
 
+              {{- if .Values.siteInstall.activeTheme }}
+              # Theme activation. Idempotent — wp_options.{template,stylesheet}
+              # already matching is a no-op. `--skip-themes` so a previously
+              # broken active theme doesn't fatal WP load before we can switch
+              # away from it (recovery path after a botched paid-theme release).
+              # `set -x` echoes the resolved command before exec — avoids
+              # nested-quote rendering issues in a manual `echo "..."` line.
+              echo "[install] activating theme:"
+              ( set -x; $WP --skip-themes theme activate {{ .Values.siteInstall.activeTheme | quote }} )
+              {{- end }}
+
+              {{- with .Values.siteInstall.postDeployCommands }}
+              # Post-deploy commands. Run on every install + upgrade. Failures
+              # exit the Job non-zero (Helm marks release failed; Deployment
+              # itself is not rolled back — pod is already serving traffic).
+              # Same `set -x`-in-a-subshell pattern: arbitrary wp-cli args
+              # (which often contain `"` for PHP eval strings) print + run
+              # cleanly without us hand-quoting each one.
+              echo "[post-deploy] running {{ len . }} command(s):"
+              {{- range . }}
+              ( set -x; $WP {{ . }} )
+              {{- end }}
+              {{- end }}
+
               echo "[install] done"
           envFrom:
             - configMapRef:
