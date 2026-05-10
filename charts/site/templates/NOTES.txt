@@ -7,7 +7,7 @@ Welcome to FrankenPress.
 ** Please be patient while the site comes up — the first install bootstraps WP and seeds the database. **
 
 The site image is:
-  {{ include "fp-site.image" . }}
+  {{ include "site.image" . }}
 
 To reach it from inside the cluster:
   http://{{ include "common.names.fullname" . }}.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}:{{ .Values.service.ports.http }}
@@ -35,14 +35,14 @@ No Ingress / HTTPRoute is enabled. To expose locally on a kind cluster:
 WordPress is installed automatically by a post-install Helm hook Job.
 Retrieve the auto-generated admin password:
 
-  kubectl --namespace {{ .Release.Namespace }} get secret {{ include "fp-site.siteInstallSecretName" . }} \
+  kubectl --namespace {{ .Release.Namespace }} get secret {{ include "site.siteInstallSecretName" . }} \
     -o jsonpath='{.data.admin_password}' | base64 -d
 
 Log in as `{{ .Values.siteInstall.adminUser }}` with the password above.
 {{- else }}
 
 WordPress is installed automatically by a post-install Helm hook Job.
-Admin credentials live in the existing Secret `{{ include "fp-site.siteInstallSecretName" . }}`.
+Admin credentials live in the existing Secret `{{ include "site.siteInstallSecretName" . }}`.
 {{- end }}
 {{- else }}
 

@@ -1,4 +1,4 @@
-# CLAUDE.md — fp-charts
+# CLAUDE.md — charts
 
 Guidance for Claude Code when working in this repo.
 
@@ -10,14 +10,14 @@ which deploys a single FrankenPress WordPress site to Kubernetes.
 Charts are published as OCI artifacts on GHCR:
 **`oci://ghcr.io/frankenpress/charts/site`** (current: `0.5.0`).
 
-Public docs: **<https://docs.frankenpress.com/components/fp-charts>**
+Public docs: **<https://docs.frankenpress.com/components/charts>**
 
 ## Style: Bitnami chart conventions, throughout
 
 - Every public value in `values.yaml` carries a `## @param <path> <description>` annotation. Bitnami's `readme-generator-for-helm` (and our docs) consume these.
 - Naming/labels/image templating goes through [`bitnami/common`](https://github.com/bitnami/charts/tree/main/bitnami/common) helpers (`common.names.fullname`, `common.labels.standard`, `common.images.image`, `common.tplvalues.render`). Don't reinvent them.
 - Subchart deps via Bitnami's OCI registry: `oci://registry-1.docker.io/bitnamicharts/<name>`.
-- Production-grade `securityContext` defaults that satisfy PSA `restricted:latest` out of the box: `readOnlyRootFilesystem`, `runAsUser:33`, `runAsNonRoot:true`, `allowPrivilegeEscalation:false`, `capabilities.drop:[ALL]` (no `add`), pod-level `seccompProfile.type:RuntimeDefault`. Works with the `fp-runtime` v0.1.x line because that runtime ships FrankenPHP with the `cap_net_bind_service` file capability stripped (`setcap -r`); a custom runtime that re-adds the cap needs the chart values overridden — see the comment block above `containerSecurityContext` in `values.yaml`.
+- Production-grade `securityContext` defaults that satisfy PSA `restricted:latest` out of the box: `readOnlyRootFilesystem`, `runAsUser:33`, `runAsNonRoot:true`, `allowPrivilegeEscalation:false`, `capabilities.drop:[ALL]` (no `add`), pod-level `seccompProfile.type:RuntimeDefault`. Works with the `runtime` v0.1.x line because that runtime ships FrankenPHP with the `cap_net_bind_service` file capability stripped (`setcap -r`); a custom runtime that re-adds the cap needs the chart values overridden — see the comment block above `containerSecurityContext` in `values.yaml`.
 
 ## File layout
 
@@ -27,7 +27,7 @@ Public docs: **<https://docs.frankenpress.com/components/fp-charts>**
   - `bitnami/redis` (conditional `redis.enabled`)
   - `bitnami/minio` (conditional `minio.enabled`)
 - `charts/site/values.yaml` — single source of truth for the public API. Every value documented inline.
-- `charts/site/templates/_helpers.tpl` — chart-local helpers. **Wraps subchart-vs-external resolution** (`fp-site.databaseHost`, `fp-site.cacheHost`, `fp-site.s3Endpoint`, `fp-site.s3SecretName`, etc.) so flipping `<subchart>.enabled: false` is a one-line change in values.
+- `charts/site/templates/_helpers.tpl` — chart-local helpers. **Wraps subchart-vs-external resolution** (`site.databaseHost`, `site.cacheHost`, `site.s3Endpoint`, `site.s3SecretName`, etc.) so flipping `<subchart>.enabled: false` is a one-line change in values.
 - `charts/site/templates/{deployment,service,configmap,secret,cronjob-wpcron,serviceaccount,ingress,httproute,hpa}.yaml` — single-tenant resources for the site.
 - `charts/site/README.md` — chart-specific README (TL;DR + production topology).
 - `.github/workflows/lint.yml` — `helm lint` + `helm template` + `chart-testing ct lint` on push/PR.
@@ -78,7 +78,7 @@ If you add or rename a `values.yaml` key:
 
 1. Add the `## @param` annotation
 2. Update `charts/site/README.md` if it's surfaced there
-3. Update `https://docs.frankenpress.com/components/fp-charts` (in [`docs`](https://github.com/frankenpress/docs))
+3. Update `https://docs.frankenpress.com/components/charts` (in [`docs`](https://github.com/frankenpress/docs))
 4. Update `https://docs.frankenpress.com/operations/configuration`
 5. Bump `Chart.yaml.version` (patch unless it's a breaking schema change)
 

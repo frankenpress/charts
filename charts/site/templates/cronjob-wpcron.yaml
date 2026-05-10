@@ -15,7 +15,7 @@ spec:
       template:
         spec:
           restartPolicy: OnFailure
-          serviceAccountName: {{ include "fp-site.serviceAccountName" . }}
+          serviceAccountName: {{ include "site.serviceAccountName" . }}
           {{- if .Values.image.pullSecrets }}
           imagePullSecrets:
             {{- range .Values.image.pullSecrets }}
@@ -25,7 +25,7 @@ spec:
           securityContext: {{- toYaml .Values.podSecurityContext | nindent 12 }}
           containers:
             - name: wpcron
-              image: {{ include "fp-site.image" . }}
+              image: {{ include "site.image" . }}
               imagePullPolicy: {{ .Values.image.pullPolicy }}
               securityContext: {{- toYaml .Values.containerSecurityContext | nindent 16 }}
               command:
@@ -59,26 +59,26 @@ spec:
                 - name: DB_PASSWORD
                   valueFrom:
                     secretKeyRef:
-                      name: {{ include "fp-site.databaseSecretName" . }}
-                      key: {{ include "fp-site.databaseSecretPasswordKey" . }}
+                      name: {{ include "site.databaseSecretName" . }}
+                      key: {{ include "site.databaseSecretPasswordKey" . }}
                 - name: FP_S3_KEY
                   valueFrom:
                     secretKeyRef:
-                      name: {{ include "fp-site.s3SecretName" . }}
-                      key: {{ include "fp-site.s3AccessKeyKey" . }}
+                      name: {{ include "site.s3SecretName" . }}
+                      key: {{ include "site.s3AccessKeyKey" . }}
                 - name: FP_S3_SECRET
                   valueFrom:
                     secretKeyRef:
-                      name: {{ include "fp-site.s3SecretName" . }}
-                      key: {{ include "fp-site.s3SecretKeyKey" . }}
+                      name: {{ include "site.s3SecretName" . }}
+                      key: {{ include "site.s3SecretKeyKey" . }}
                 {{- range $name := list "AUTH_KEY" "SECURE_AUTH_KEY" "LOGGED_IN_KEY" "NONCE_KEY" "AUTH_SALT" "SECURE_AUTH_SALT" "LOGGED_IN_SALT" "NONCE_SALT" }}
                 - name: {{ $name }}
                   valueFrom:
                     secretKeyRef:
-                      name: {{ include "fp-site.secretName" $ }}
+                      name: {{ include "site.secretName" $ }}
                       key: {{ $name }}
                 {{- end }}
-                {{- include "fp-site.smtpEnvFromSecret" . | nindent 16 }}
+                {{- include "site.smtpEnvFromSecret" . | nindent 16 }}
               resources: {{- toYaml .Values.resources | nindent 16 }}
               volumeMounts:
                 - name: tmp

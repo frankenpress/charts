@@ -1,4 +1,4 @@
-# Default values for fp-site.
+# Default values for site.
 # This file is documented Bitnami-style: every public value carries
 # `## @param <path> <description>` annotations so README generators can
 # emit a consistent reference table.
@@ -34,10 +34,10 @@ commonAnnotations: {}
 extraDeploy: []
 
 ## @section FrankenPress site image
-## The site image you built from fp-site-template (or your fork of it).
+## The site image you built from site-template (or your fork of it).
 
 ## @param image.registry [default: REGISTRY_NAME] Site image registry
-## @param image.repository [default: REPOSITORY_NAME/fp-site] Site image repository
+## @param image.repository [default: REPOSITORY_NAME/site] Site image repository
 ## @skip image.tag Site image tag (immutable tags are recommended). Defaults to chart appVersion
 ## @param image.digest Site image digest in the way sha256:aaaa...
 ## @param image.pullPolicy Site image pull policy
@@ -58,7 +58,7 @@ image:
 ## @param site.wpPath Path under site.url where WordPress core lives. Bedrock convention is `/wp`
 ##
 site:
-  url: "http://fp-site.localhost"
+  url: "http://site.localhost"
   env: production
   wpPath: /wp
 
@@ -251,8 +251,8 @@ podSecurityContext:
 ## These defaults satisfy PodSecurity Standard `restricted:latest` without
 ## additional overrides. The pair (`allowPrivilegeEscalation: false`,
 ## `capabilities.drop: [ALL]`) is safe because the FrankenPHP binary in
-## fp-runtime ships *without* the `cap_net_bind_service=ep` file capability
-## — stripped by `setcap -r` in fp-runtime's Dockerfile, since `FP_PORT`
+## runtime ships *without* the `cap_net_bind_service=ep` file capability
+## — stripped by `setcap -r` in runtime's Dockerfile, since `FP_PORT`
 ## defaults to 8080 (no low-port bind). If you build a custom runtime image
 ## that re-adds the file cap, the kernel's `no_new_privs` flag (set when
 ## `allowPrivilegeEscalation: false`) will refuse to exec it. In that case,
@@ -296,7 +296,7 @@ service:
 ingress:
   enabled: false
   className: ""
-  hostname: fp-site.localhost
+  hostname: site.localhost
   path: /
   pathType: Prefix
   annotations: {}
@@ -328,11 +328,11 @@ serviceAccount:
 
 ## @section SMTP (optional, transport-agnostic mail delivery)
 ##
-## The fp-runtime image ships no MTA, so PHP's `mail()` fails silently
+## The runtime image ships no MTA, so PHP's `mail()` fails silently
 ## and `wp_mail()` returns true while no email actually delivers. Set
 ## `smtp.enabled=true` and provide a Secret containing SMTP auth
 ## credentials to wire the global PHPMailer (via the SMTPMailer mu-plugin
-## component, fp-mu-plugin >=0.5.0) to send through any SMTP server —
+## component, mu-plugin >=0.5.0) to send through any SMTP server —
 ## Postmark, SendGrid, Mailgun, AWS SES, in-cluster relay, etc.
 ##
 ## When `smtp.enabled=false` (default), no `FP_SMTP_*` env is injected
@@ -342,7 +342,7 @@ serviceAccount:
 ## `smtp.enabled=true`, the change notification actually delivers via
 ## the configured server.
 
-## @param smtp.enabled Wire SMTP into wp_mail(). Requires `smtp.host` and `smtp.auth.existingSecret`. Sites built from `fp-site-template` v0.2.4+ honour this; older images ignore it.
+## @param smtp.enabled Wire SMTP into wp_mail(). Requires `smtp.host` and `smtp.auth.existingSecret`. Sites built from `site-template` v0.2.4+ honour this; older images ignore it.
 ## @param smtp.host SMTP server hostname (e.g. `smtp.postmarkapp.com`)
 ## @param smtp.port TCP port (587 STARTTLS, 465 implicit TLS, 25 plaintext — don't)
 ## @param smtp.encryption `tls` (STARTTLS), `ssl` (implicit TLS), `none` (local dev only)
@@ -422,7 +422,7 @@ extraEnvVarsSecret: ""
 
 ## @section Filesystem
 ## The site image is read-only at the root; tmpfs mounts are required
-## for the writable paths fp-runtime expects:
+## for the writable paths runtime expects:
 ##   /tmp     — PHP scratch
 ##   /data    — XDG_DATA_HOME (Caddy data + TLS storage)
 ##   /config  — XDG_CONFIG_HOME (Caddy autosave.json)

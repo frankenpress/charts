@@ -23,7 +23,7 @@
 # Usage:
 #
 #   ./tests/lockdown-test.sh                       # uses defaults below
-#   IMAGE_REPO=fp-site IMAGE_TAG=dev IMAGE_PULL_POLICY=Never \
+#   IMAGE_REPO=site IMAGE_TAG=dev IMAGE_PULL_POLICY=Never \
 #     KUBE_CONTEXT=kind-frankenpress \
 #     ./tests/lockdown-test.sh                     # local kind w/ built image
 #   KEEP=1 ./tests/lockdown-test.sh                # don't uninstall on exit
