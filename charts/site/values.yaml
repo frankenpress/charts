@@ -45,7 +45,7 @@ extraDeploy: []
 ##
 image:
   registry: ghcr.io
-  repository: eightoeight/fp-site-template
+  repository: frankenpress/site-template
   tag: ""
   digest: ""
   pullPolicy: IfNotPresent
