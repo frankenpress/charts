@@ -101,7 +101,7 @@ POD=$(kubectl "${KUBECTL_ARGS[@]}" -n "$NAMESPACE" get pod \
     -l app.kubernetes.io/name=site \
     --field-selector=status.phase=Running \
     -o jsonpath='{.items[0].metadata.name}')
-[[ -n "$POD" ]] || { log "no Running fp-site pod found"; exit 1; }
+[[ -n "$POD" ]] || { log "no Running site pod found"; exit 1; }
 log "site pod: $POD"
 
 WP=(wp --allow-root --path=/app/web/wp)

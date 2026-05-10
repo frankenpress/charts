@@ -80,4 +80,4 @@ Run it yourself once the site pod is Ready:
    `externalS3.*` pointing at AWS S3 / R2 / GCS XML.
 {{- end }}
 
-For the full values reference: `helm show values oci://ghcr.io/eightoeight/charts/fp-site`
+For the full values reference: `helm show values oci://ghcr.io/frankenpress/charts/site`

@@ -1,13 +1,13 @@
 apiVersion: v2
 name: site
-description: FrankenPress WordPress site — Caddy + FrankenPHP + Souin (HTTP cache) + humanmade/s3-uploads (media offload). Deploys a single site image (built from fp-site-template) plus optional in-cluster MariaDB / Redis / MinIO subcharts for instant on-cluster deployment.
+description: FrankenPress WordPress site — Caddy + FrankenPHP + Souin (HTTP cache) + humanmade/s3-uploads (media offload). Deploys a single site image (built from site-template) plus optional in-cluster MariaDB / Redis / MinIO subcharts for instant on-cluster deployment.
 type: application
 icon: https://eightoeight.io/icon.png
 
 # Chart version. Bumped on every change to templates / values / Chart.yaml.
 version: 0.5.0
 
-# Application version. Tracks the fp-site-template release we test against.
+# Application version. Tracks the site-template release we test against.
 appVersion: "0.2.4"
 
 kubeVersion: ">=1.27.0-0"
@@ -20,12 +20,12 @@ keywords:
   - s3
   - bedrock
 
-home: https://github.com/EightOEight/fp-charts
+home: https://github.com/frankenpress/charts
 sources:
-  - https://github.com/EightOEight/fp-charts
-  - https://github.com/EightOEight/fp-runtime
-  - https://github.com/EightOEight/fp-mu-plugin
-  - https://github.com/EightOEight/fp-site-template
+  - https://github.com/frankenpress/charts
+  - https://github.com/frankenpress/runtime
+  - https://github.com/frankenpress/mu-plugin
+  - https://github.com/frankenpress/site-template
 
 maintainers:
   - name: EightOEight Ltd.

@@ -1,12 +1,12 @@
-# fp-site Helm chart
+# site Helm chart
 
-Deploys a [FrankenPress](https://github.com/EightOEight/fp-runtime) WordPress
+Deploys a [FrankenPress](https://github.com/frankenpress/runtime) WordPress
 site (Caddy + FrankenPHP + Souin + S3) to Kubernetes.
 
 ## TL;DR
 
 ```bash
-helm install mysite oci://ghcr.io/eightoeight/charts/fp-site \
+helm install mysite oci://ghcr.io/frankenpress/charts/site \
   --namespace mysite --create-namespace \
   --set image.repository=ghcr.io/<your-org>/<your-site>,image.tag=v1.0.0 \
   --set site.url=https://mysite.example.com
@@ -27,7 +27,7 @@ see [Production topology](#production-topology) below.
                                   ┌──────────────┐
                   ┌──────────────►│  MariaDB     │  (subchart, dev only)
   ┌────────────┐  │                └──────────────┘
-  │ fp-site    │──┤              ┌──────────────┐
+  │ site       │──┤              ┌──────────────┐
   │ (FrankenPHP│  ├─────────────►│  Redis       │  (subchart, dev only)
   │  + Caddy + │  │                └──────────────┘
   │  Souin)    │──┘              ┌──────────────┐
@@ -43,7 +43,7 @@ For production, replace the three subcharts with:
 ## Production topology
 
 ```bash
-helm install mysite oci://ghcr.io/eightoeight/charts/fp-site \
+helm install mysite oci://ghcr.io/frankenpress/charts/site \
   --namespace mysite --create-namespace \
   --values values-prod.yaml
 ```
@@ -123,23 +123,23 @@ kind create cluster --name fp
 
 # 2. Build the site image and load it into kind
 cd /path/to/your-site
-docker build -t fp-site:dev --build-arg FP_RUNTIME_IMAGE=fp-runtime --build-arg FP_RUNTIME_VERSION=dev .
-kind load docker-image fp-site:dev --name fp
+docker build -t site:dev --build-arg FP_RUNTIME_IMAGE=fp-runtime --build-arg FP_RUNTIME_VERSION=dev .
+kind load docker-image site:dev --name fp
 
 # 3. Install the chart with all subcharts enabled (default)
-helm install mysite oci://ghcr.io/eightoeight/charts/fp-site \
+helm install mysite oci://ghcr.io/frankenpress/charts/site \
   --namespace mysite --create-namespace \
-  --set image.repository=fp-site,image.tag=dev,image.pullPolicy=Never
+  --set image.repository=site,image.tag=dev,image.pullPolicy=Never
 
 # 4. Wait for pods to come up
 kubectl --namespace mysite get pods --watch
 
 # 5. Retrieve the auto-generated admin password
-kubectl --namespace mysite get secret mysite-fp-site-install \
+kubectl --namespace mysite get secret mysite-site-install \
   -o jsonpath='{.data.admin_password}' | base64 -d
 
 # 6. Port-forward and log into wp-admin
-kubectl --namespace mysite port-forward svc/mysite-fp-site 8080:80
+kubectl --namespace mysite port-forward svc/mysite-site 8080:80
 open http://localhost:8080/wp/wp-admin/
 ```
 
@@ -154,18 +154,18 @@ re-runs), so it's safe across `helm upgrade`s and pod restarts.
 
 ### Default (auto-generated admin)
 
-By default the chart creates a `<release>-fp-site-install` Secret with
+By default the chart creates a `<release>-site-install` Secret with
 a random 32-char password. Retrieve it with:
 
 ```bash
-kubectl --namespace mysite get secret mysite-fp-site-install \
+kubectl --namespace mysite get secret mysite-site-install \
   -o jsonpath='{.data.admin_password}' | base64 -d
 ```
 
 Override the username, email, or password at install time:
 
 ```bash
-helm install mysite oci://ghcr.io/eightoeight/charts/fp-site \
+helm install mysite oci://ghcr.io/frankenpress/charts/site \
   --set siteInstall.adminUser=alice \
   --set siteInstall.adminEmail=alice@example.com \
   --set siteInstall.adminPassword=please-change-me
@@ -183,7 +183,7 @@ kubectl create secret generic mysite-admin \
   --from-literal=admin_email=alice@example.com \
   --from-literal=admin_password=$(openssl rand -base64 24)
 
-helm install mysite oci://ghcr.io/eightoeight/charts/fp-site \
+helm install mysite oci://ghcr.io/frankenpress/charts/site \
   --set siteInstall.existingSecret=mysite-admin
 ```
 
@@ -215,15 +215,15 @@ rotation is self-driving end-to-end:
 # (lands on the Deployment's metadata.annotations, which is what
 # Reloader watches), NOT `podAnnotations` (lands on the pod-template).
 # For an auto-generated install Secret, the name is
-# `<release>-fp-site-install`.
+# `<release>-site-install`.
 commonAnnotations:
-  secret.reloader.stakater.com/reload: "mysite-fp-site-install"
+  secret.reloader.stakater.com/reload: "mysite-site-install"
 ```
 
 ```bash
 # Whatever rotates your Secret (manual edit, ESO sync from cloud
 # secrets manager, sealed-secret rotation, etc.) updates the value:
-kubectl patch secret mysite-fp-site-install \
+kubectl patch secret mysite-site-install \
   -p '{"stringData":{"admin_password":"new-value"}}'
 
 # Reloader rolls the Deployment → initContainer detects drift →
@@ -247,7 +247,7 @@ changes, restart the Deployment and pods pick up the new value
 automatically — no chart-side reconciliation needed.
 
 ```bash
-kubectl rollout restart deployment/mysite-fp-site
+kubectl rollout restart deployment/mysite-site
 ```
 
 (Rotating the password on the DB server itself is out of scope — that's
@@ -259,7 +259,7 @@ For sites being restored from an existing database dump, skip the
 install Job entirely:
 
 ```bash
-helm install mysite oci://ghcr.io/eightoeight/charts/fp-site \
+helm install mysite oci://ghcr.io/frankenpress/charts/site \
   --set siteInstall.enabled=false
 ```
 
@@ -275,10 +275,10 @@ annotations following the Bitnami chart convention).
 
 | Repo | Purpose |
 |---|---|
-| [`fp-runtime`](https://github.com/EightOEight/fp-runtime) | Caddy + FrankenPHP + Souin base image |
-| [`fp-mu-plugin`](https://github.com/EightOEight/fp-mu-plugin) | Must-use plugin (S3 bootstrap + Souin invalidator + Site Health + SMTP) |
-| [`fp-site-template`](https://github.com/EightOEight/fp-site-template) | GitHub template for new sites — what this chart deploys |
-| [`fp-charts`](https://github.com/EightOEight/fp-charts) (this repo) | Helm charts |
+| [`runtime`](https://github.com/frankenpress/runtime) | Caddy + FrankenPHP + Souin base image |
+| [`mu-plugin`](https://github.com/frankenpress/mu-plugin) | Must-use plugin (S3 bootstrap + Souin invalidator + Site Health + SMTP) |
+| [`site-template`](https://github.com/frankenpress/site-template) | GitHub template for new sites — what this chart deploys |
+| [`charts`](https://github.com/frankenpress/charts) (this repo) | Helm charts |
 
 ## License
 
