@@ -116,7 +116,7 @@ siteInstall:
 ## An initContainer on every site Pod that reads admin user/email/password
 ## from the install Secret and reconciles wp_users to match. Combined with
 ## a controller that rolls the Deployment when the Secret changes (e.g.
-## stakater/Reloader watching the auto-generated `<release>-fp-site-install`
+## stakater/Reloader watching the auto-generated `<release>-site-install`
 ## Secret, or a user-supplied `existingSecret`), credential rotation
 ## becomes self-driving end-to-end:
 ##
@@ -171,7 +171,7 @@ podLabels: {}
 ##
 ##   podAnnotations:
 ##     ad.datadoghq.com/site.logs: |
-##       [{"source": "caddy", "service": "fp-site"}]
+##       [{"source": "caddy", "service": "site"}]
 ##
 ## Full integration guide: https://docs.frankenpress.com/operations/logging
 podAnnotations: {}

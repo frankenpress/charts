@@ -1,7 +1,7 @@
-# fp-charts
+# charts
 
 **FrankenPress Helm charts** — Kubernetes deployment for the [FrankenPress
-WordPress stack](https://github.com/EightOEight).
+WordPress stack](https://github.com/frankenpress).
 
 **Documentation:** <https://docs.frankenpress.com/components/fp-charts>
 
@@ -9,20 +9,20 @@ WordPress stack](https://github.com/EightOEight).
 
 | Chart | Description |
 |---|---|
-| [`fp-site`](./charts/fp-site) | Deploys a single FrankenPress WordPress site. Optionally bundles MariaDB + Redis + MinIO subcharts for instant on-cluster deploy (NOT for production). |
+| [`site`](./charts/site) | Deploys a single FrankenPress WordPress site. Optionally bundles MariaDB + Redis + MinIO subcharts for instant on-cluster deploy (NOT for production). |
 
 ## Install
 
 The charts are published as OCI artifacts on GHCR:
 
 ```bash
-helm install mysite oci://ghcr.io/eightoeight/charts/fp-site \
+helm install mysite oci://ghcr.io/frankenpress/charts/site \
   --version 0.5.0 \
   --namespace mysite --create-namespace
 ```
 
 Each chart's directory contains its own README with full values reference.
-See [`charts/fp-site/README.md`](./charts/fp-site/README.md) for `fp-site`.
+See [`charts/site/README.md`](./charts/site/README.md) for `site`.
 
 ## Style
 
@@ -52,24 +52,24 @@ operator-managed instances:
 | Object storage | bitnami/minio subchart | AWS S3 / R2 / GCS XML / etc. |
 | WP keys+salts | auto-generated Job | [External Secrets Operator](https://external-secrets.io/) |
 
-See [`charts/fp-site/README.md`](./charts/fp-site/README.md) for an
+See [`charts/site/README.md`](./charts/site/README.md) for an
 example production values file.
 
 ## Local development
 
 ```bash
 # Lint
-helm lint charts/fp-site
+helm lint charts/site
 
 # Render manifests without installing
-helm template smoketest charts/fp-site --namespace smoketest
+helm template smoketest charts/site --namespace smoketest
 
 # Pull subchart deps
-helm dependency update charts/fp-site
+helm dependency update charts/site
 
 # Install on a kind cluster
 kind create cluster --name fp
-helm install mysite charts/fp-site --namespace mysite --create-namespace
+helm install mysite charts/site --namespace mysite --create-namespace
 ```
 
 ## License
