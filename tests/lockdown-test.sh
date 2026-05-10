@@ -98,7 +98,7 @@ helm "${HELM_ARGS[@]}" install "$RELEASE" "$CHART_DIR" \
     --wait --timeout 5m >/dev/null
 
 POD=$(kubectl "${KUBECTL_ARGS[@]}" -n "$NAMESPACE" get pod \
-    -l app.kubernetes.io/name=fp-site \
+    -l app.kubernetes.io/name=site \
     --field-selector=status.phase=Running \
     -o jsonpath='{.items[0].metadata.name}')
 [[ -n "$POD" ]] || { log "no Running fp-site pod found"; exit 1; }

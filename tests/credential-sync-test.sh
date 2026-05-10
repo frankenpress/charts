@@ -78,9 +78,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-INSTALL_SECRET="${RELEASE}-fp-site-install"
-DEPLOYMENT="${RELEASE}-fp-site"
-POD_SELECTOR="app.kubernetes.io/name=fp-site,app.kubernetes.io/instance=${RELEASE}"
+INSTALL_SECRET="${RELEASE}-site-install"
+DEPLOYMENT="${RELEASE}-site"
+POD_SELECTOR="app.kubernetes.io/name=site,app.kubernetes.io/instance=${RELEASE}"
 
 # ---------------------------------------------------------------------
 # Helpers
