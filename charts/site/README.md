@@ -268,17 +268,41 @@ schema-compatible with the WP core version baked into the site image.
 
 ### Post-deploy actions (theme activation + custom wp-cli)
 
-The install Job (which already fires on `post-install` + `post-upgrade`)
-runs two extra steps after `wp core install` / `update-db`:
+The install Job runs two extra steps after `wp core install` / `update-db`:
 
 1. **`siteInstall.activeTheme`** — if set, runs `wp --skip-themes theme activate <slug>`. `--skip-themes` so a previously broken active theme doesn't fatal WP-CLI before the switch lands (the recovery path after a botched paid-theme release).
 2. **`siteInstall.postDeployCommands`** — a list of raw wp-cli sub-commands run in order, each as `wp --path=/app/web/wp <entry>`. Use for theme-specific post-activation hooks the theme itself only fires on admin save (e.g. cached LESS → CSS regen).
 
 Both run on every release — they must be **idempotent**. A non-zero
-exit fails the Job (Helm marks the release failed; `kubectl logs job/<release>-site-install`
-has the output) but the Deployment itself is **not** rolled back —
+exit fails the Job; the Deployment itself is **not** rolled back —
 the new pod is already serving traffic by then. Treat post-deploy
-failures as fix-forward.
+failures as fix-forward; `kubectl -n <ns> logs job/<release>-site-install-<hash>`
+has the output (last 7 days kept by default — see `siteInstall.ttlSecondsAfterFinished`).
+
+#### How the Job is named (and why)
+
+The Job is **named by a hash of the inputs that affect its rendered spec**:
+
+```
+<release>-site-install-<sha8(chartVersion|imageTag|imageRepo|siteInstall)>
+```
+
+So every meaningful change — chart bump, image bump, `activeTheme`
+flip, new entry in `postDeployCommands` — produces a distinct Job
+resource. ArgoCD sees it as drift on a tracked resource and runs
+the new Job; the previous-hash Job is GC'd after
+`siteInstall.ttlSecondsAfterFinished` (default 7 days).
+
+This was a `helm.sh/hook: post-install,post-upgrade` resource pre-0.7.0.
+It was changed because ArgoCD translates Helm hooks into PostSync
+hooks, and **PostSync hook resources don't contribute to drift
+detection** — values-only changes that only touched the Job's content
+left the Application "Synced" and the hook never re-fired. Naming
+the Job by an inputs hash gets ArgoCD's drift detection involved.
+
+Vanilla-Helm consumers see the equivalent behaviour: `helm upgrade`
+applies the new manifest, the old hash's Job is left to its TTL,
+the new one runs.
 
 Worked example — paid theme `dt-the7` with The7's dynamic-CSS hash
 that gets stuck if a prior release fataled mid-compile:

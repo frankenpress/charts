@@ -1,18 +1,50 @@
 {{- if .Values.siteInstall.enabled }}
+{{/*
+  Hash-named tracked Job (was a `helm.sh/hook` resource pre-0.7.0).
+
+  Why the change: ArgoCD translates `helm.sh/hook: post-install,post-upgrade`
+  to its `PostSync` hook, and PostSync hook resources are NOT part of
+  ArgoCD's drift detection. So values-only changes that *only* affect
+  this Job's rendered content (e.g. flipping `siteInstall.activeTheme`)
+  left the Application "Synced" and the Job never re-fired. Naming the
+  Job by a hash of its inputs makes every meaningful change a new
+  resource — ArgoCD sees it, syncs it, runs it. Vanilla-Helm consumers
+  see the same effect: helm upgrade applies the new manifest, old Job
+  is GC'd by `ttlSecondsAfterFinished`.
+
+  Hash inputs (anything that can change the rendered Job spec):
+    - .Chart.Version       — chart bumps that change the script
+    - .Values.image.tag    — site image bumps trigger a fresh `wp core
+                             update-db` against the new schema
+    - .Values.image.repository
+    - whole .Values.siteInstall — title, activeTheme, postDeployCommands,
+                                   any future siteInstall.* additions
+*/}}
+{{- $hashInputs := printf "%s|%s|%s|%s" .Chart.Version .Values.image.tag .Values.image.repository (.Values.siteInstall | toJson) }}
+{{- $hash := sha256sum $hashInputs | trunc 8 }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ printf "%s-install" (include "common.names.fullname" .) | trunc 52 | trimSuffix "-" }}
+  name: {{ printf "%s-install-%s" (include "common.names.fullname" . | trunc 44 | trimSuffix "-") $hash }}
   namespace: {{ .Release.Namespace | quote }}
-  labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+  labels:
+    {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
+    app.kubernetes.io/component: install
   annotations:
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-weight": "5"
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    # Run after the Deployment + most other tracked resources. The Job
+    # has its own DB-readiness probe so it doesn't strictly need the
+    # Deployment to be Healthy first, but a high wave keeps logs and
+    # health-check ordering predictable in the ArgoCD UI.
+    argocd.argoproj.io/sync-wave: "30"
     {{- if .Values.commonAnnotations }}
     {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
     {{- end }}
 spec:
+  # Auto-clean completed Jobs after 7 days. Each new hash creates a new
+  # Job (old hash's Job stays around for the TTL window so failures are
+  # debuggable). ArgoCD's Prune also picks up Jobs whose hash is no
+  # longer in the rendered manifests.
+  ttlSecondsAfterFinished: {{ .Values.siteInstall.ttlSecondsAfterFinished | default 604800 }}
   backoffLimit: {{ .Values.siteInstall.backoffLimit }}
   activeDeadlineSeconds: {{ .Values.siteInstall.activeDeadlineSeconds }}
   template:

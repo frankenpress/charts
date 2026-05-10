@@ -98,6 +98,7 @@ keysSalts:
 ## @param siteInstall.activeDeadlineSeconds Hard deadline for the install Job
 ## @param siteInstall.activeTheme Theme slug to activate after `wp core install` (e.g. `dt-the7`). Empty leaves whatever WP defaults to. Idempotent on re-run.
 ## @param siteInstall.postDeployCommands List of raw wp-cli sub-commands run after `activeTheme` on every install + upgrade. Each entry is passed verbatim to `wp --path=/app/web/wp <entry>`. Use for theme-specific post-activation hooks (e.g. The7 dynamic-CSS regen). Run in declared order; a non-zero exit fails the Job loudly but does NOT roll back the Deployment.
+## @param siteInstall.ttlSecondsAfterFinished How long to keep completed install Jobs before Kubernetes garbage-collects them. Each chart-version / image-tag / siteInstall change creates a new hash-named Job; this controls how long old ones stick around for log inspection. 7 days by default.
 ##
 siteInstall:
   enabled: true
@@ -115,6 +116,7 @@ siteInstall:
   activeDeadlineSeconds: 600
   activeTheme: ""
   postDeployCommands: []
+  ttlSecondsAfterFinished: 604800
 
 ## @section Admin credential sync (rotation)
 ## An initContainer on every site Pod that reads admin user/email/password
