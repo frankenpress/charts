@@ -41,8 +41,8 @@ KUBE_CONTEXT="${KUBE_CONTEXT:-}"
 # Note: bare `-` (not `:-`) so an explicit empty string is respected
 # — kind clusters consuming a locally-loaded image need registry="".
 IMAGE_REGISTRY="${IMAGE_REGISTRY-ghcr.io}"
-IMAGE_REPO="${IMAGE_REPO:-eightoeight/fp-site-template}"
-IMAGE_TAG="${IMAGE_TAG:-v0.2.3}"
+IMAGE_REPO="${IMAGE_REPO:-frankenpress/site-template}"
+IMAGE_TAG="${IMAGE_TAG:-v0.2.5}"
 IMAGE_PULL_POLICY="${IMAGE_PULL_POLICY:-IfNotPresent}"
 KEEP="${KEEP:-0}"
 
