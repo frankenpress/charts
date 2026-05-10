@@ -11,15 +11,15 @@ data:
   WP_ENV: {{ .Values.site.env | quote }}
   WP_HOME: {{ .Values.site.url | quote }}
   WP_SITEURL: {{ printf "%s%s" (.Values.site.url | trimSuffix "/") .Values.site.wpPath | quote }}
-  DB_HOST: {{ include "fp-site.databaseHost" . | quote }}
-  DB_NAME: {{ include "fp-site.databaseName" . | quote }}
-  DB_USER: {{ include "fp-site.databaseUser" . | quote }}
-  REDIS_URL: {{ include "fp-site.cacheUrl" . | quote }}
-  FP_SOUIN_REDIS_HOST: {{ include "fp-site.cacheHost" . | quote }}
-  FP_SOUIN_REDIS_PORT: {{ include "fp-site.cachePort" . | quote }}
-  FP_S3_BUCKET: {{ include "fp-site.s3Bucket" . | quote }}
-  FP_S3_REGION: {{ include "fp-site.s3Region" . | quote }}
-  FP_S3_ENDPOINT: {{ include "fp-site.s3Endpoint" . | quote }}
+  DB_HOST: {{ include "site.databaseHost" . | quote }}
+  DB_NAME: {{ include "site.databaseName" . | quote }}
+  DB_USER: {{ include "site.databaseUser" . | quote }}
+  REDIS_URL: {{ include "site.cacheUrl" . | quote }}
+  FP_SOUIN_REDIS_HOST: {{ include "site.cacheHost" . | quote }}
+  FP_SOUIN_REDIS_PORT: {{ include "site.cachePort" . | quote }}
+  FP_S3_BUCKET: {{ include "site.s3Bucket" . | quote }}
+  FP_S3_REGION: {{ include "site.s3Region" . | quote }}
+  FP_S3_ENDPOINT: {{ include "site.s3Endpoint" . | quote }}
   {{- if and (not .Values.minio.enabled) .Values.externalS3.bucketUrl }}
   FP_S3_BUCKET_URL: {{ .Values.externalS3.bucketUrl | quote }}
   {{- end }}
@@ -38,10 +38,10 @@ data:
   DISABLE_WP_CRON: {{ .Values.wpCron.enabled | quote }}
   {{- if .Values.smtp.enabled }}
   # SMTP — consumed by the SMTPMailer mu-plugin component
-  # (fp-mu-plugin >=0.5.0). USERNAME / PASSWORD live in
+  # (mu-plugin >=0.5.0). USERNAME / PASSWORD live in
   # `smtp.auth.existingSecret` and are injected into the Deployment,
   # wpcron CronJob, and install Job via secretKeyRef (see
-  # `fp-site.smtpEnvFromSecret` helper).
+  # `site.smtpEnvFromSecret` helper).
   FP_SMTP_HOST: {{ .Values.smtp.host | quote }}
   FP_SMTP_PORT: {{ .Values.smtp.port | quote }}
   FP_SMTP_ENCRYPTION: {{ .Values.smtp.encryption | quote }}

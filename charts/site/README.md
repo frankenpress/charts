@@ -123,7 +123,7 @@ kind create cluster --name fp
 
 # 2. Build the site image and load it into kind
 cd /path/to/your-site
-docker build -t site:dev --build-arg FP_RUNTIME_IMAGE=fp-runtime --build-arg FP_RUNTIME_VERSION=dev .
+docker build -t site:dev --build-arg FP_RUNTIME_IMAGE=runtime --build-arg FP_RUNTIME_VERSION=dev .
 kind load docker-image site:dev --name fp
 
 # 3. Install the chart with all subcharts enabled (default)

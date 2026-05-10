@@ -30,7 +30,7 @@ jobs:
           KUBE_CONTEXT: kind-e2e
           # Pulls the published site image — a regression in the image
           # itself (e.g. AUTOMATIC_UPDATER_DISABLED accidentally relaxed
-          # in fp-site-template) is exactly what this test catches.
+          # in site-template) is exactly what this test catches.
           IMAGE_REGISTRY: ghcr.io
           IMAGE_REPO: frankenpress/site-template
           IMAGE_TAG: v0.2.5

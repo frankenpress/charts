@@ -19,7 +19,7 @@
 # Usage:
 #
 #   ./tests/credential-sync-test.sh                         # uses defaults below
-#   IMAGE_REPO=fp-site IMAGE_TAG=dev IMAGE_PULL_POLICY=Never \
+#   IMAGE_REPO=site IMAGE_TAG=dev IMAGE_PULL_POLICY=Never \
 #     KUBE_CONTEXT=kind-frankenpress \
 #     ./tests/credential-sync-test.sh                       # local kind w/ built image
 #   KEEP=1 ./tests/credential-sync-test.sh                  # don't uninstall on exit

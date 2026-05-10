@@ -29,7 +29,7 @@ spec:
         {{- include "common.tplvalues.render" ( dict "value" .Values.podAnnotations "context" $ ) | nindent 8 }}
         {{- end }}
     spec:
-      serviceAccountName: {{ include "fp-site.serviceAccountName" . }}
+      serviceAccountName: {{ include "site.serviceAccountName" . }}
       automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
       {{- if .Values.image.pullSecrets }}
       imagePullSecrets:
@@ -61,7 +61,7 @@ spec:
         # rotation is self-driving end-to-end. Idempotent — see the
         # `syncAdminCredentials` block in values.yaml.
         - name: sync-admin-credentials
-          image: {{ include "fp-site.image" . }}
+          image: {{ include "site.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           command:
@@ -186,41 +186,41 @@ spec:
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "fp-site.databaseSecretName" . }}
-                  key: {{ include "fp-site.databaseSecretPasswordKey" . }}
+                  name: {{ include "site.databaseSecretName" . }}
+                  key: {{ include "site.databaseSecretPasswordKey" . }}
             - name: FP_S3_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "fp-site.s3SecretName" . }}
-                  key: {{ include "fp-site.s3AccessKeyKey" . }}
+                  name: {{ include "site.s3SecretName" . }}
+                  key: {{ include "site.s3AccessKeyKey" . }}
             - name: FP_S3_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "fp-site.s3SecretName" . }}
-                  key: {{ include "fp-site.s3SecretKeyKey" . }}
+                  name: {{ include "site.s3SecretName" . }}
+                  key: {{ include "site.s3SecretKeyKey" . }}
             {{- range $name := list "AUTH_KEY" "SECURE_AUTH_KEY" "LOGGED_IN_KEY" "NONCE_KEY" "AUTH_SALT" "SECURE_AUTH_SALT" "LOGGED_IN_SALT" "NONCE_SALT" }}
             - name: {{ $name }}
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "fp-site.secretName" $ }}
+                  name: {{ include "site.secretName" $ }}
                   key: {{ $name }}
             {{- end }}
             - name: ADMIN_USER
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "fp-site.siteInstallSecretName" . }}
-                  key: {{ include "fp-site.siteInstallAdminUserKey" . }}
+                  name: {{ include "site.siteInstallSecretName" . }}
+                  key: {{ include "site.siteInstallAdminUserKey" . }}
             - name: ADMIN_EMAIL
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "fp-site.siteInstallSecretName" . }}
-                  key: {{ include "fp-site.siteInstallAdminEmailKey" . }}
+                  name: {{ include "site.siteInstallSecretName" . }}
+                  key: {{ include "site.siteInstallAdminEmailKey" . }}
             - name: ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "fp-site.siteInstallSecretName" . }}
-                  key: {{ include "fp-site.siteInstallAdminPasswordKey" . }}
-            {{- include "fp-site.smtpEnvFromSecret" . | nindent 12 }}
+                  name: {{ include "site.siteInstallSecretName" . }}
+                  key: {{ include "site.siteInstallAdminPasswordKey" . }}
+            {{- include "site.smtpEnvFromSecret" . | nindent 12 }}
             {{- if .Values.extraEnvVars }}
             {{- include "common.tplvalues.render" ( dict "value" .Values.extraEnvVars "context" $ ) | nindent 12 }}
             {{- end }}
@@ -235,7 +235,7 @@ spec:
       {{- end }}
       containers:
         - name: site
-          image: {{ include "fp-site.image" . }}
+          image: {{ include "site.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
@@ -261,8 +261,8 @@ spec:
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "fp-site.databaseSecretName" . }}
-                  key: {{ include "fp-site.databaseSecretPasswordKey" . }}
+                  name: {{ include "site.databaseSecretName" . }}
+                  key: {{ include "site.databaseSecretPasswordKey" . }}
             {{- if and (not .Values.redis.enabled) (or .Values.externalCache.password .Values.externalCache.existingSecret) }}
             - name: FP_SOUIN_REDIS_PASSWORD
               valueFrom:
@@ -273,21 +273,21 @@ spec:
             - name: FP_S3_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "fp-site.s3SecretName" . }}
-                  key: {{ include "fp-site.s3AccessKeyKey" . }}
+                  name: {{ include "site.s3SecretName" . }}
+                  key: {{ include "site.s3AccessKeyKey" . }}
             - name: FP_S3_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "fp-site.s3SecretName" . }}
-                  key: {{ include "fp-site.s3SecretKeyKey" . }}
+                  name: {{ include "site.s3SecretName" . }}
+                  key: {{ include "site.s3SecretKeyKey" . }}
             {{- range $name := list "AUTH_KEY" "SECURE_AUTH_KEY" "LOGGED_IN_KEY" "NONCE_KEY" "AUTH_SALT" "SECURE_AUTH_SALT" "LOGGED_IN_SALT" "NONCE_SALT" }}
             - name: {{ $name }}
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "fp-site.secretName" $ }}
+                  name: {{ include "site.secretName" $ }}
                   key: {{ $name }}
             {{- end }}
-            {{- include "fp-site.smtpEnvFromSecret" . | nindent 12 }}
+            {{- include "site.smtpEnvFromSecret" . | nindent 12 }}
             {{- if .Values.extraEnvVars }}
             {{- include "common.tplvalues.render" ( dict "value" .Values.extraEnvVars "context" $ ) | nindent 12 }}
             {{- end }}
