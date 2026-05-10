@@ -46,7 +46,7 @@ IMAGE_TAG="${IMAGE_TAG:-v0.2.3}"
 IMAGE_PULL_POLICY="${IMAGE_PULL_POLICY:-IfNotPresent}"
 KEEP="${KEEP:-0}"
 
-CHART_DIR="$(cd "$(dirname "$0")/.." && pwd)/charts/fp-site"
+CHART_DIR="$(cd "$(dirname "$0")/.." && pwd)/charts/site"
 
 KUBECTL_ARGS=()
 HELM_ARGS=()
