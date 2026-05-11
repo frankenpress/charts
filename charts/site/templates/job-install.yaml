@@ -132,6 +132,50 @@ spec:
               ( set -x; $WP --skip-themes theme activate {{ .Values.siteInstall.activeTheme | quote }} )
               {{- end }}
 
+              {{- if .Values.siteInstall.snapshot.ref }}
+              # FrankenPress snapshot apply. Phase 0 of the FrankenPress
+              # promotion CLI: downloads a snapshot bundle from S3 and
+              # invokes `wp fp apply --snapshot-dir`, which:
+              #
+              #   - verifies db.sql.gz sha256 against manifest
+              #   - imports the sanitised SQL
+              #   - runs `wp search-replace` to retarget URLs to home_url()
+              #   - fires premium-theme adapter post_restore hooks
+              #   - stamps fp_snapshot_applied_ref + fp_snapshot_applied_sha256
+              #
+              # Idempotent: re-runs against the same .ref exit in <100ms
+              # because `wp fp apply` short-circuits on those option markers.
+              #
+              # aws-cli is installed on-demand (runtime image doesn't ship
+              # it). Matches the same `awscli-exe-linux-x86_64.zip` install
+              # pattern used by `gitops-fp/base/shared-site/restore.yaml` —
+              # consistency keeps ops muscle memory transferable.
+              SNAPSHOT_BUCKET={{ default .Values.externalS3.bucket .Values.siteInstall.snapshot.bucket | quote }}
+              SNAPSHOT_KEY={{ .Values.siteInstall.snapshot.s3Key | quote }}
+              SNAPSHOT_REF={{ .Values.siteInstall.snapshot.ref | quote }}
+              echo "[snapshot] applying ref=$SNAPSHOT_REF from s3://$SNAPSHOT_BUCKET/$SNAPSHOT_KEY"
+
+              if ! command -v aws >/dev/null 2>&1; then
+                echo "[snapshot] installing awscli v2"
+                apt-get update -qq && apt-get install -y -qq curl unzip
+                curl -sSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscli.zip
+                ( cd /tmp && unzip -q awscli.zip && ./aws/install -i /usr/local/aws-cli -b /usr/local/bin )
+                rm -rf /tmp/awscli.zip /tmp/aws
+              fi
+
+              SNAPSHOT_DIR=$(mktemp -d -t fp-snapshot-XXXXXX)
+              trap 'rm -rf "$SNAPSHOT_DIR"' EXIT
+              # aws-cli reads AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY by
+              # name, not FP_S3_*. Bridge them here so we don't have to
+              # duplicate Secret refs in env: above.
+              AWS_ACCESS_KEY_ID="$FP_S3_KEY" \
+              AWS_SECRET_ACCESS_KEY="$FP_S3_SECRET" \
+              AWS_DEFAULT_REGION="${FP_S3_REGION:-us-east-1}" \
+                aws {{ if .Values.externalS3.endpoint }}--endpoint-url={{ .Values.externalS3.endpoint | quote }} {{ end }}s3 sync "s3://$SNAPSHOT_BUCKET/$SNAPSHOT_KEY" "$SNAPSHOT_DIR/" --only-show-errors
+
+              ( set -x; $WP fp apply --snapshot-dir="$SNAPSHOT_DIR" )
+              {{- end }}
+
               {{- with .Values.siteInstall.postDeployCommands }}
               # Post-deploy commands. Run on every install + upgrade. Failures
               # exit the Job non-zero (Helm marks release failed; Deployment
