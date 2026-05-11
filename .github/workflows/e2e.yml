@@ -33,6 +33,6 @@ jobs:
           # in site-template) is exactly what this test catches.
           IMAGE_REGISTRY: ghcr.io
           IMAGE_REPO: frankenpress/site-template
-          IMAGE_TAG: v0.2.5
+          IMAGE_TAG: v0.2.7
           IMAGE_PULL_POLICY: IfNotPresent
         run: ./tests/lockdown-test.sh
