@@ -151,17 +151,32 @@ spec:
               # build path.
               SNAPSHOTS_DIR={{ .Values.siteInstall.snapshotsDir | quote }}
               if [ -d "$SNAPSHOTS_DIR" ]; then
-                for snap_dir in "$SNAPSHOTS_DIR"/*/; do
-                  [ -e "$snap_dir" ] || continue
-                  if [ ! -f "${snap_dir}manifest.json" ]; then
-                    echo "[snapshot] skipping ${snap_dir} (no manifest.json)"
-                    continue
-                  fi
-                  echo "[snapshot] applying ${snap_dir%/}"
-                  ( set -x; $WP fp apply --snapshot-dir="${snap_dir%/}" )
-                done
+                # Count snapshot candidate subdirs first so the
+                # empty-dir case logs visibly. Bash's bare
+                # `for snap_dir in "$SNAPSHOTS_DIR"/*/` glob expands
+                # to the literal pattern when nothing matches, which
+                # the `[ -d ]` test inside then quietly rejects —
+                # leaving operators with no log line at all. Counting
+                # up front via `find -mindepth 1` makes the no-op case
+                # observable, which matters when an install Job log
+                # is the only signal of what the chart actually did.
+                snap_count=$(find "$SNAPSHOTS_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
+                if [ "$snap_count" -eq 0 ]; then
+                  echo "[snapshot] no snapshot directories under $SNAPSHOTS_DIR (designer hasn't committed any yet)"
+                else
+                  echo "[snapshot] processing $snap_count snapshot directories under $SNAPSHOTS_DIR"
+                  for snap_dir in "$SNAPSHOTS_DIR"/*/; do
+                    [ -d "$snap_dir" ] || continue
+                    if [ ! -f "${snap_dir}manifest.json" ]; then
+                      echo "[snapshot] skipping ${snap_dir%/} (no manifest.json)"
+                      continue
+                    fi
+                    echo "[snapshot] applying ${snap_dir%/}"
+                    ( set -x; $WP fp apply --snapshot-dir="${snap_dir%/}" )
+                  done
+                fi
               else
-                echo "[snapshot] $SNAPSHOTS_DIR not found; skipping (no snapshots baked into image)"
+                echo "[snapshot] $SNAPSHOTS_DIR not found; no snapshots in this image"
               fi
               {{- end }}
 
