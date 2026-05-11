@@ -98,9 +98,7 @@ keysSalts:
 ## @param siteInstall.activeDeadlineSeconds Hard deadline for the install Job
 ## @param siteInstall.activeTheme Theme slug to activate after `wp core install` (e.g. `dt-the7`). Empty leaves whatever WP defaults to. Idempotent on re-run.
 ## @param siteInstall.postDeployCommands List of raw wp-cli sub-commands run after `activeTheme` on every install + upgrade. Each entry is passed verbatim to `wp --path=/app/web/wp <entry>`. Use for theme-specific post-activation hooks (e.g. The7 dynamic-CSS regen). Run in declared order; a non-zero exit fails the Job loudly but does NOT roll back the Deployment.
-## @param siteInstall.snapshot.ref FrankenPress snapshot id to apply on install (e.g. "architect-2-20260511-091422"). Empty = no snapshot applied. When set, the install Job fetches the snapshot bundle from S3 between theme activation and postDeployCommands, then runs `wp fp apply` (idempotent on `fp_snapshot_applied_ref` option). Phase 0 of the FrankenPress promotion CLI — see `mu-plugin/src/Cli/Apply/Restorer.php`.
-## @param siteInstall.snapshot.s3Key Object-key prefix under siteInstall.snapshot.bucket (e.g. "snapshots/architect-2-20260511-091422/"). The Job runs `aws s3 sync s3://<bucket>/<s3Key> <tmpdir>` and passes `<tmpdir>` to `wp fp apply --snapshot-dir`.
-## @param siteInstall.snapshot.bucket S3 bucket holding snapshot blobs. Defaults to .Values.externalS3.bucket (re-uses the site's media-bucket credentials via FP_S3_KEY / FP_S3_SECRET; IAM policy must grant read access to the prefix). Production sites typically point this at a dedicated `<tenant>-snapshots` bucket via a separate Secret in `extraEnvVarsSecret`; that path is opt-in and orthogonal to the chart.
+## @param siteInstall.snapshotsDir Directory inside the site image holding FrankenPress snapshots (one subdirectory per snapshot). The install Job iterates each subdir whose manifest.json exists and runs `wp fp apply --snapshot-dir=<that>`. Apply is idempotent — re-runs short-circuit on the `fp_snapshot_applied_ref` + `fp_snapshot_applied_sha256` option markers. Empty disables snapshot apply entirely. Default `/app/web/imports` matches site-template's Bedrock layout. Snapshots are produced by `wp fp snapshot` (frankenpress/mu-plugin v0.8.0+) and committed into the site repo at `web/imports/<slug>/`; they're baked into the site image at build time, so no separate artefact store is needed — the immutable image carries them.
 ## @param siteInstall.ttlSecondsAfterFinished How long to keep completed install Jobs before Kubernetes garbage-collects them. Each chart-version / image-tag / siteInstall change creates a new hash-named Job; this controls how long old ones stick around for log inspection. 7 days by default.
 ##
 siteInstall:
@@ -119,10 +117,7 @@ siteInstall:
   activeDeadlineSeconds: 600
   activeTheme: ""
   postDeployCommands: []
-  snapshot:
-    ref: ""
-    s3Key: ""
-    bucket: ""
+  snapshotsDir: "/app/web/imports"
   ttlSecondsAfterFinished: 604800
 
 ## @section Admin credential sync (rotation)
