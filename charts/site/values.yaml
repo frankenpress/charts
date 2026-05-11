@@ -100,6 +100,7 @@ keysSalts:
 ## @param siteInstall.postDeployCommands List of raw wp-cli sub-commands run after `activeTheme` on every install + upgrade. Each entry is passed verbatim to `wp --path=/app/web/wp <entry>`. Use for theme-specific post-activation hooks (e.g. The7 dynamic-CSS regen). Run in declared order; a non-zero exit fails the Job loudly but does NOT roll back the Deployment.
 ## @param siteInstall.snapshotsDir Directory inside the site image holding FrankenPress snapshots (one subdirectory per snapshot). The install Job iterates each subdir whose manifest.json exists and runs `wp fp apply --snapshot-dir=<that>`. Apply is idempotent — re-runs short-circuit on the `fp_snapshot_applied_ref` + `fp_snapshot_applied_sha256` option markers. Empty disables snapshot apply entirely. Default `/app/web/imports` matches site-template's Bedrock layout. Snapshots are produced by `wp fp snapshot` (frankenpress/mu-plugin v0.8.0+) and committed into the site repo at `web/imports/<slug>/`; they're baked into the site image at build time, so no separate artefact store is needed — the immutable image carries them.
 ## @param siteInstall.ttlSecondsAfterFinished How long to keep completed install Jobs before Kubernetes garbage-collects them. Each chart-version / image-tag / siteInstall change creates a new hash-named Job; this controls how long old ones stick around for log inspection. 7 days by default.
+## @param siteInstall.containerSecurityContext.readOnlyRootFilesystem Read-only root filesystem for the install Job container. Defaults to `false` (writable). Different threat model from the web Pod: install Jobs are ephemeral (single-shot, no traffic), so a writable overlay FS is safe AND is required for `wp fp apply` to transiently install WP-Importer via `wp plugin install`. Web Pods (long-running, network-facing) keep `containerSecurityContext.readOnlyRootFilesystem: true` unchanged. Set this to `true` to opt back into the lockdown on the install Job (will break snapshot apply unless WP-Importer is baked into the image via composer).
 ##
 siteInstall:
   enabled: true
@@ -119,6 +120,15 @@ siteInstall:
   postDeployCommands: []
   snapshotsDir: "/app/web/imports"
   ttlSecondsAfterFinished: 604800
+  ## Install Job container securityContext. Inherits everything from
+  ## `containerSecurityContext` EXCEPT `readOnlyRootFilesystem`, which is
+  ## overridden here (default `false`) so `wp fp apply` can `wp plugin
+  ## install` WP-Importer transiently into the Job's overlay FS. The Job
+  ## is ephemeral — the overlay is GC'd when the pod terminates; the
+  ## image is never actually mutated. Web Pods (where the threat model
+  ## that motivates RO FS lives) are NOT affected by this override.
+  containerSecurityContext:
+    readOnlyRootFilesystem: false
 
 ## @section Admin credential sync (rotation)
 ## An initContainer on every site Pod that reads admin user/email/password

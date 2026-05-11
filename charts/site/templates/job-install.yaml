@@ -64,13 +64,43 @@ spec:
         - name: install
           image: {{ include "site.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          {{/*
+            Install Job containerSecurityContext = web Pod
+            containerSecurityContext (PSA-restricted-compatible baseline)
+            with siteInstall.containerSecurityContext overlaid on top.
+            Web Pods keep readOnlyRootFilesystem: true; install Jobs flip
+            it to false so `wp fp apply` can transiently `wp plugin install`
+            WP-Importer (and, in future, any plugin a snapshot manifest
+            declares it needs at apply time). The install Job is ephemeral;
+            the overlay disappears with the pod. The image is never
+            mutated.
+          */}}
+          securityContext: {{- mergeOverwrite (deepCopy .Values.containerSecurityContext) (default dict .Values.siteInstall.containerSecurityContext) | toYaml | nindent 12 }}
           command:
             - /bin/sh
             - -c
             - |
               set -eu
-              WP="wp --allow-root --path=/app/web/wp"
+
+              # The install Job is the one place we relax the immutable-
+              # image lockdown's WP-level DISALLOW_FILE_MODS constant.
+              # `config/application.php` sets it to `true` whenever
+              # KUBERNETES_SERVICE_HOST is present (the in-cluster gate),
+              # which blocks `wp plugin install`. We need that during
+              # snapshot apply for transient plugins like WP-Importer.
+              #
+              # Approach: write a one-shot PHP file that pre-defines
+              # the constants BEFORE wp-config.php loads, then pass it
+              # via wp-cli's `--require=`. Bedrock's `Config::define()`
+              # silently no-ops when a constant is already defined, so
+              # application.php's lockdown lines become a safe no-op.
+              # Scope is Job-local — web Pods never source this file.
+              cat > /tmp/lockdown-override.php <<'PHP'
+              <?php
+              if ( ! defined( 'DISALLOW_FILE_MODS' ) ) { define( 'DISALLOW_FILE_MODS', false ); }
+              if ( ! defined( 'DISALLOW_FILE_EDIT' ) ) { define( 'DISALLOW_FILE_EDIT', false ); }
+              PHP
+              WP="wp --allow-root --path=/app/web/wp --require=/tmp/lockdown-override.php"
 
               # Direct mysqli probe — doesn't load WordPress, so it works
               # before `wp core install` has created wp_options. (`wp db *`
