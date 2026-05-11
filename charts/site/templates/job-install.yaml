@@ -81,26 +81,7 @@ spec:
             - -c
             - |
               set -eu
-
-              # The install Job is the one place we relax the immutable-
-              # image lockdown's WP-level DISALLOW_FILE_MODS constant.
-              # `config/application.php` sets it to `true` whenever
-              # KUBERNETES_SERVICE_HOST is present (the in-cluster gate),
-              # which blocks `wp plugin install`. We need that during
-              # snapshot apply for transient plugins like WP-Importer.
-              #
-              # Approach: write a one-shot PHP file that pre-defines
-              # the constants BEFORE wp-config.php loads, then pass it
-              # via wp-cli's `--require=`. Bedrock's `Config::define()`
-              # silently no-ops when a constant is already defined, so
-              # application.php's lockdown lines become a safe no-op.
-              # Scope is Job-local — web Pods never source this file.
-              cat > /tmp/lockdown-override.php <<'PHP'
-              <?php
-              if ( ! defined( 'DISALLOW_FILE_MODS' ) ) { define( 'DISALLOW_FILE_MODS', false ); }
-              if ( ! defined( 'DISALLOW_FILE_EDIT' ) ) { define( 'DISALLOW_FILE_EDIT', false ); }
-              PHP
-              WP="wp --allow-root --path=/app/web/wp --require=/tmp/lockdown-override.php"
+              WP="wp --allow-root --path=/app/web/wp"
 
               # Direct mysqli probe — doesn't load WordPress, so it works
               # before `wp core install` has created wp_options. (`wp db *`
@@ -236,6 +217,18 @@ spec:
                 name: {{ tpl .Values.extraEnvVarsSecret . }}
             {{- end }}
           env:
+            # Install-Job-only opt-out of the in-cluster lockdown.
+            # `config/application.php` in the site-template gates
+            # DISALLOW_FILE_EDIT / DISALLOW_FILE_MODS on
+            # `KUBERNETES_SERVICE_HOST AND !FP_ALLOW_FILE_MODS`. Setting
+            # this to 1 here lets the install Job run `wp plugin
+            # install` transiently (used by `wp fp apply` to bring up
+            # WP-Importer just for the duration of snapshot apply).
+            # Web Pods, wpcron CronJob, and the admin-credentials
+            # initContainer never see this variable, so the lockdown
+            # remains in force everywhere it matters.
+            - name: FP_ALLOW_FILE_MODS
+              value: "1"
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
