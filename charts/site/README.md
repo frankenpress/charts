@@ -304,22 +304,29 @@ Vanilla-Helm consumers see the equivalent behaviour: `helm upgrade`
 applies the new manifest, the old hash's Job is left to its TTL,
 the new one runs.
 
-Worked example — paid theme `dt-the7` with The7's dynamic-CSS hash
-that gets stuck if a prior release fataled mid-compile:
+Worked example — activate an FSE block theme on first deploy and
+flush permalinks (idempotent; useful when the site repo committed
+new pages whose URLs depend on `permalink_structure`):
 
 ```yaml
 siteInstall:
-  activeTheme: dt-the7
+  activeTheme: twentytwentyfive
   postDeployCommands:
-    # Force-regen the the7-css/ dynamic stylesheets to S3 / uploads.
-    # The7's own hook updates the gating hash *before* the compile,
-    # so a prior fatal leaves the hash "done" and the next clean
-    # release won't re-fire without this nudge.
-    - 'eval "delete_option(\"the7_last_dynamic_stylesheets_hash\"); the7_maybe_regenerate_dynamic_css();"'
+    # Flush rewrite rules — cheap and safe to run on every helm
+    # upgrade. Site won't 404 newly-added pages if permalink
+    # structure or new CPTs landed in this release.
+    - 'rewrite flush --hard'
 ```
 
 Both values default empty — sites that don't need a theme switch
-or any post-deploy commands pay no extra Job time.
+or any post-deploy commands pay no extra Job time. The chart is
+theme-agnostic: the same hook surface works for any active theme,
+classic or FSE. For FSE sites, snapshot apply (via the bundled
+`wp fp apply` step in the install Job) handles template /
+template-part / global-styles / navigation imports automatically
+from `web/imports/<slug>/` directories baked into the site image —
+`postDeployCommands` is for the residual one-shot fixups that
+don't fit the snapshot model.
 
 ## Values reference
 
