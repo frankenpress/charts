@@ -5,10 +5,10 @@ type: application
 icon: https://frankenpress.com/icon.png
 
 # Chart version. Bumped on every change to templates / values / Chart.yaml.
-version: 0.10.1
+version: 0.11.0
 
 # Application version. Tracks the site-template release we test against.
-appVersion: "0.3.0"
+appVersion: "0.6.0"
 
 kubeVersion: ">=1.27.0-0"
 

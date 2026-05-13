@@ -162,15 +162,30 @@ spec:
               # build path.
               SNAPSHOTS_DIR={{ .Values.siteInstall.snapshotsDir | quote }}
               if [ -d "$SNAPSHOTS_DIR" ]; then
-                # Count snapshot candidate subdirs first so the
-                # empty-dir case logs visibly. Bash's bare
-                # `for snap_dir in "$SNAPSHOTS_DIR"/*/` glob expands
-                # to the literal pattern when nothing matches, which
-                # the `[ -d ]` test inside then quietly rejects —
-                # leaving operators with no log line at all. Counting
-                # up front via `find -mindepth 1` makes the no-op case
-                # observable, which matters when an install Job log
-                # is the only signal of what the chart actually did.
+                # Enforce the single-snapshot convention: at most one
+                # snapshot directory with a manifest.json may exist
+                # under SNAPSHOTS_DIR per release. Pre-Phase-2 the
+                # loop iterated alphabetically and let last-write-win;
+                # that quietly applied stale snapshots from forgotten
+                # earlier releases alongside the canonical current
+                # one, producing wrong-design-state renders.
+                #
+                # Convention: commit one snapshot dir per release under
+                # web/imports/<slug>/, `git rm` the previous one in
+                # the same PR. The install Job refuses to apply when
+                # multiple snapshot dirs are present.
+                manifest_count=$(find "$SNAPSHOTS_DIR" -mindepth 2 -maxdepth 2 -name manifest.json -type f 2>/dev/null | wc -l | tr -d ' ')
+                if [ "$manifest_count" -gt 1 ]; then
+                  echo "[snapshot] ERROR: $manifest_count snapshot directories with manifest.json under $SNAPSHOTS_DIR — the convention is one snapshot per release."
+                  echo "[snapshot] Snapshot directories found:"
+                  find "$SNAPSHOTS_DIR" -mindepth 2 -maxdepth 2 -name manifest.json -type f 2>/dev/null | xargs -n1 dirname
+                  echo "[snapshot] Remove stale snapshot dirs from the site repo (web/imports/<old-slug>/) and re-tag. Apply will not proceed until this is resolved."
+                  exit 1
+                fi
+
+                # Subdir count drives the "no snapshots committed yet"
+                # log line below. The for-loop's manifest.json gate
+                # skips .gitkeep-only subdirs.
                 snap_count=$(find "$SNAPSHOTS_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
                 if [ "$snap_count" -eq 0 ]; then
                   echo "[snapshot] no snapshot directories under $SNAPSHOTS_DIR (designer hasn't committed any yet)"
