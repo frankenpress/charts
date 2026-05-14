@@ -40,6 +40,7 @@ Public docs: **<https://docs.frankenpress.com/components/charts>**
 - **All Bitnami images overridden to `bitnamilegacy/*`** by default. Bitnami withdrew their public `bitnami/<name>` images from free Docker Hub in 2025 ("Bitnami Secure Images" commercial pivot). The legacy mirror is the canonical override path. If `bitnamilegacy` ever goes away too, we'd switch to inline templates using upstream images.
 - **Chart version is bumped on every change** to templates / values / Chart.yaml. Releases happen by tagging `vX.Y.Z` matching the Chart.yaml version. Tag-driven, never push-to-main-driven.
 - **`appVersion` tracks `site-template`** — the WordPress site image we test against. Bump it when you bump the default `image.tag` in values.
+- **Install Job picks latest snapshot by `manifest.created` (v0.12.0+).** Multiple `web/imports/<slug>/` directories baked into the site image can coexist — the install Job reads each `manifest.json`, picks the one with the highest `created` UTC timestamp, and applies that one. Older snapshots are logged as `skipped — older` but kept as history. Single-snapshot tenants take a fast path (no per-manifest parse). Pre-v0.12.0 the Job hard-failed on >1 `manifest.json` and tenants had to `git rm` the previous snapshot per release; that constraint is gone. Pairs with `frankenpress/fp` v0.5.0+ which defaults `fp snapshot` slugs to UTC timestamps.
 
 ## Don'ts
 
