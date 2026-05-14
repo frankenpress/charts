@@ -250,6 +250,28 @@ readinessProbe:
   timeoutSeconds: 3
   failureThreshold: 3
 
+## @param startupProbe.enabled Enable startup probe. Protects first-boot pods (e.g. when the install Job's snapshot apply takes a while, or the runtime cold-starts behind it) from being killed by readiness failures. Once startupProbe succeeds, K8s switches to liveness/readiness. Default on — `/healthz` always exists on the runtime image, so this is safe everywhere; turn off only if you've ripped out the runtime's health endpoint.
+## @param startupProbe.httpGet.path HTTP path for startup probe
+## @param startupProbe.httpGet.port HTTP port for startup probe
+## @param startupProbe.initialDelaySeconds Initial delay
+## @param startupProbe.periodSeconds Period
+## @param startupProbe.timeoutSeconds Timeout
+## @param startupProbe.failureThreshold Failure threshold. With `periodSeconds=5`, `failureThreshold=30` gives ~150s of first-boot tolerance — enough for a cold composer/opcache prime, well under the chart's default `terminationGracePeriodSeconds`.
+##
+startupProbe:
+  enabled: true
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 30
+
+## @param terminationGracePeriodSeconds Pod termination grace period (seconds). Caddy's graceful shutdown completes in ~30s on the runtime image (drains in-flight HTTP requests + FrankenPHP workers); 45s gives a 15s buffer for the slowest tail (e.g. a long PHP request finishing) before SIGKILL. Raise if you have endpoints that legitimately take >30s to finalise.
+##
+terminationGracePeriodSeconds: 45
+
 ## @section Security context (production-grade defaults)
 
 ## @param podSecurityContext.runAsNonRoot Run pod as non-root
@@ -330,13 +352,18 @@ ingress:
 ## @section Gateway API HTTPRoute (optional)
 
 ## @param httpRoute.enabled Enable Gateway API HTTPRoute
-## @param httpRoute.parentRefs Parent Gateway references (array of {name, namespace, sectionName, port})
+## @param httpRoute.parentRefs Parent Gateway references (array of {name, namespace, sectionName, port}). Use `sectionName` to target a specific Gateway listener (e.g. an HTTPS listener for TLS termination). When `tls.enabled` is true, the chart auto-injects `sectionName` on every parentRef.
 ## @param httpRoute.hostnames Hostnames the route matches
+## @param httpRoute.tls.enabled Mark this route as TLS-terminated. The chart injects `sectionName: <tls.sectionName>` on every parentRef so the route binds to an HTTPS listener on the parent Gateway. Cert handling stays on the Gateway (chart doesn't render Gateway resources); the parent Gateway is expected to have an HTTPS listener with `certificateRefs` configured. Parity with `ingress.tls`.
+## @param httpRoute.tls.sectionName Listener section name on the parent Gateway when `tls.enabled=true`. Override if your Gateway's HTTPS listener has a non-default name.
 ##
 httpRoute:
   enabled: false
   parentRefs: []
   hostnames: []
+  tls:
+    enabled: false
+    sectionName: https
 
 ## @section ServiceAccount
 
@@ -418,6 +445,36 @@ autoscaling:
   maxReplicas: 4
   targetCPUUtilizationPercentage: 80
   targetMemoryUtilizationPercentage: ""
+
+## @section Pod Disruption Budget (optional)
+
+## @param podDisruptionBudget.enabled Render a PodDisruptionBudget. Recommended for production with `replicaCount >= 2` or `autoscaling.enabled=true` (PDB guards voluntary disruptions during node drains / cluster upgrades). Disabled by default — a single-replica deploy can't satisfy a PDB without making node drains hang.
+## @param podDisruptionBudget.minAvailable Min available pods. Integer or percentage string (`"50%"`). Set one of `minAvailable` / `maxUnavailable` — leaving both at the defaults takes `minAvailable` only.
+## @param podDisruptionBudget.maxUnavailable Max unavailable pods. Set to `null` to use `minAvailable` exclusively (default).
+##
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  maxUnavailable: null
+
+## @section Reloader integration (optional)
+##
+## Wires up [stakater/Reloader](https://github.com/stakater/Reloader) for
+## secret-rotation-driven pod rolls. Useful when an external controller
+## (External Secrets Operator, your own rotation Job) updates a Secret
+## that the site pods consume — without this annotation, the Deployment
+## ignores the change until the next manual rollout.
+##
+## Requires Reloader installed cluster-wide. Safe to set when Reloader
+## isn't installed: the annotation becomes inert, the Deployment just
+## doesn't auto-roll on Secret changes.
+
+## @param reloader.enabled Emit a `secret.reloader.stakater.com/reload` annotation on the Deployment pod template. The annotation is only emitted when at least one Secret name is configured in `secretsToWatch`.
+## @param reloader.secretsToWatch List of Secret names to watch (comma-joined in the rendered annotation). Empty list → no annotation emitted, even when `enabled: true`. Typical values include `wp-creds` (admin credentials managed by ESO) and `<site>-smtp-credentials` if SMTP creds also rotate.
+##
+reloader:
+  enabled: false
+  secretsToWatch: []
 
 ## @section wp-cron CronJob
 
