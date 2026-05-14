@@ -235,6 +235,10 @@ livenessProbe:
 ## @param readinessProbe.enabled Enable readiness probe
 ## @param readinessProbe.httpGet.path HTTP path for readiness probe
 ## @param readinessProbe.httpGet.port HTTP port for readiness probe
+## @param readinessProbe.initialDelaySeconds Initial delay
+## @param readinessProbe.periodSeconds Period
+## @param readinessProbe.timeoutSeconds Timeout
+## @param readinessProbe.failureThreshold Failure threshold
 ##
 readinessProbe:
   enabled: true
@@ -265,6 +269,7 @@ podSecurityContext:
 ## @param containerSecurityContext.allowPrivilegeEscalation Allow privilege escalation
 ## @param containerSecurityContext.readOnlyRootFilesystem Read-only root filesystem
 ## @param containerSecurityContext.capabilities.drop Capabilities to drop
+## @param containerSecurityContext.seccompProfile.type Seccomp profile type (`RuntimeDefault` satisfies PSA `restricted:latest`; duplicated from podSecurityContext for defense-in-depth — PSA validates the container-level value when both are set)
 ##
 ## These defaults satisfy PodSecurity Standard `restricted:latest` without
 ## additional overrides. The pair (`allowPrivilegeEscalation: false`,
@@ -284,6 +289,8 @@ containerSecurityContext:
   capabilities:
     drop:
       - ALL
+  seccompProfile:
+    type: RuntimeDefault
 
 ## @section Service
 
