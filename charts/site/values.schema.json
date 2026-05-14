@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/frankenpress/charts/site/values.schema.json",
+  "title": "FrankenPress site chart values",
+  "description": "Top-level shape check. Catches typos in top-level keys at `helm template`/`helm install`/`helm lint` time without constraining nested structure — nested objects use `additionalProperties: true` so per-key validation can grow incrementally. If you need to inject a chart-time global the schema doesn't know about, add it to the top-level `properties` block here.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "global":                          { "type": "object", "additionalProperties": true },
+    "kubeVersion":                     { "type": "string" },
+    "nameOverride":                    { "type": "string" },
+    "fullnameOverride":                { "type": "string" },
+    "clusterDomain":                   { "type": "string" },
+    "commonLabels":                    { "type": "object", "additionalProperties": true },
+    "commonAnnotations":               { "type": "object", "additionalProperties": true },
+    "extraDeploy":                     { "type": "array" },
+
+    "image":                           { "type": "object", "additionalProperties": true },
+    "site":                            { "type": "object", "additionalProperties": true },
+    "keysSalts":                       { "type": "object", "additionalProperties": true },
+    "siteInstall":                     { "type": "object", "additionalProperties": true },
+    "syncAdminCredentials":            { "type": "boolean" },
+
+    "replicaCount":                    { "type": ["integer", "string"] },
+    "updateStrategy":                  { "type": "object", "additionalProperties": true },
+    "revisionHistoryLimit":            { "type": "integer" },
+    "podLabels":                       { "type": "object", "additionalProperties": true },
+    "podAnnotations":                  { "type": "object", "additionalProperties": true },
+    "nodeSelector":                    { "type": "object", "additionalProperties": true },
+    "tolerations":                     { "type": "array" },
+    "affinity":                        { "type": "object", "additionalProperties": true },
+    "topologySpreadConstraints":       { "type": "array" },
+    "priorityClassName":               { "type": "string" },
+    "terminationGracePeriodSeconds":   { "type": "integer" },
+
+    "resources":                       { "type": "object", "additionalProperties": true },
+    "livenessProbe":                   { "type": "object", "additionalProperties": true },
+    "readinessProbe":                  { "type": "object", "additionalProperties": true },
+    "startupProbe":                    { "type": "object", "additionalProperties": true },
+
+    "podSecurityContext":              { "type": "object", "additionalProperties": true },
+    "containerSecurityContext":        { "type": "object", "additionalProperties": true },
+
+    "service":                         { "type": "object", "additionalProperties": true },
+    "ingress":                         { "type": "object", "additionalProperties": true },
+    "httpRoute":                       { "type": "object", "additionalProperties": true },
+    "serviceAccount":                  { "type": "object", "additionalProperties": true },
+
+    "smtp":                            { "type": "object", "additionalProperties": true },
+    "serviceMonitor":                  { "type": "object", "additionalProperties": true },
+    "autoscaling":                     { "type": "object", "additionalProperties": true },
+    "podDisruptionBudget":             { "type": "object", "additionalProperties": true },
+    "reloader":                        { "type": "object", "additionalProperties": true },
+    "wpCron":                          { "type": "object", "additionalProperties": true },
+
+    "extraEnvVars":                    { "type": "array" },
+    "extraEnvVarsCM":                  { "type": "string" },
+    "extraEnvVarsSecret":              { "type": "string" },
+    "tmpfsSize":                       { "type": "object", "additionalProperties": true },
+
+    "mariadb":                         { "type": "object", "additionalProperties": true },
+    "externalDatabase":                { "type": "object", "additionalProperties": true },
+    "redis":                           { "type": "object", "additionalProperties": true },
+    "externalCache":                   { "type": "object", "additionalProperties": true },
+    "minio":                           { "type": "object", "additionalProperties": true },
+    "externalS3":                      { "type": "object", "additionalProperties": true },
+
+    "common":                          { "type": "object", "additionalProperties": true }
+  }
+}

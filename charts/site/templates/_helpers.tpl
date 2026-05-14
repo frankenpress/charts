@@ -198,6 +198,19 @@ component sees no host and is a silent no-op.
 {{- end -}}
 
 {{/*
+Reloader pod-template annotation. Emits
+`secret.reloader.stakater.com/reload: "<csv>"` when reloader.enabled
+AND secretsToWatch is non-empty. Pair with stakater/Reloader running
+cluster-wide. Empty/disabled → renders nothing, so the caller can
+splat this into a metadata.annotations block unconditionally.
+*/}}
+{{- define "site.reloaderAnnotations" -}}
+{{- if and .Values.reloader.enabled .Values.reloader.secretsToWatch -}}
+secret.reloader.stakater.com/reload: {{ join "," .Values.reloader.secretsToWatch | quote }}
+{{- end -}}
+{{- end -}}
+
+{{/*
 ServiceAccount name.
 */}}
 {{- define "site.serviceAccountName" -}}

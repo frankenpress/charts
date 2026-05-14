@@ -9,7 +9,13 @@ metadata:
   annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
   {{- end }}
 spec:
-  parentRefs: {{- toYaml .Values.httpRoute.parentRefs | nindent 4 }}
+  parentRefs:
+    {{- range .Values.httpRoute.parentRefs }}
+    - {{- toYaml . | nindent 6 }}
+      {{- if and $.Values.httpRoute.tls.enabled (not (hasKey . "sectionName")) }}
+      sectionName: {{ $.Values.httpRoute.tls.sectionName | quote }}
+      {{- end }}
+    {{- end }}
   {{- with .Values.httpRoute.hostnames }}
   hostnames: {{- toYaml . | nindent 4 }}
   {{- end }}
