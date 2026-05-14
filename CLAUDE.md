@@ -104,10 +104,17 @@ If you add or rename a `values.yaml` key:
 # Bump Chart.yaml.version in your PR. After merge:
 git tag v0.1.2
 git push origin v0.1.2
+
+# After the tag-build workflow goes green:
+gh release create v0.1.2 --generate-notes
 ```
 
 The release workflow packages and pushes to
-`oci://ghcr.io/frankenpress/charts/site:0.1.2`.
+`oci://ghcr.io/frankenpress/charts/site:0.1.2`. The `gh release create`
+step publishes a GitHub Release page with auto-generated notes from
+the PR titles since the previous tag — **don't skip it**; the OCI push
+succeeds without it but the Releases feed goes stale, which has
+recurred enough to be its own line in the workspace CLAUDE.md.
 
 ## Companion repos
 
