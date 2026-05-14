@@ -8,7 +8,7 @@ Guidance for Claude Code when working in this repo.
 which deploys a single FrankenPress WordPress site to Kubernetes.
 
 Charts are published as OCI artifacts on GHCR:
-**`oci://ghcr.io/frankenpress/charts/site`** (latest: `v0.12.0` — `charts/site/Chart.yaml` is authoritative).
+**`oci://ghcr.io/frankenpress/charts/site`** (latest: `v0.12.1` — `charts/site/Chart.yaml` is authoritative).
 
 Public docs: **<https://docs.frankenpress.com/components/charts>**
 

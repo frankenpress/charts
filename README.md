@@ -17,7 +17,7 @@ The charts are published as OCI artifacts on GHCR:
 
 ```bash
 helm install mysite oci://ghcr.io/frankenpress/charts/site \
-  --version 0.12.0 \
+  --version 0.12.1 \
   --namespace mysite --create-namespace
 ```
 
