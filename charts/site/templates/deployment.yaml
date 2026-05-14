@@ -4,8 +4,15 @@ metadata:
   name: {{ include "common.names.fullname" . }}
   namespace: {{ .Release.Namespace | quote }}
   labels: {{- include "common.labels.standard" ( dict "customLabels" .Values.commonLabels "context" $ ) | nindent 4 }}
-  {{- if .Values.commonAnnotations }}
-  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+  {{- $reloaderAnnots := include "site.reloaderAnnotations" . }}
+  {{- if or .Values.commonAnnotations $reloaderAnnots }}
+  annotations:
+    {{- with $reloaderAnnots }}
+    {{- . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.commonAnnotations }}
+    {{- include "common.tplvalues.render" ( dict "value" . "context" $ ) | nindent 4 }}
+    {{- end }}
   {{- end }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
@@ -25,9 +32,6 @@ spec:
         # Roll the pod when ConfigMap or Secret values change.
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
-        {{- with (include "site.reloaderAnnotations" .) }}
-        {{- . | nindent 8 }}
-        {{- end }}
         {{- if .Values.podAnnotations }}
         {{- include "common.tplvalues.render" ( dict "value" .Values.podAnnotations "context" $ ) | nindent 8 }}
         {{- end }}
