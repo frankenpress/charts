@@ -44,3 +44,13 @@ jobs:
       - name: ct lint
         run: |
           ct lint --target-branch main --validate-maintainers=false --check-version-increment=false --chart-dirs charts
+
+      # Unit-tests for shell scripts extracted under charts/site/files/scripts/.
+      # Each .bats file sources its target script in library mode and exercises
+      # individual functions with stubbed `wp` / `php`. ~1s per file, no
+      # cluster needed — gating regressions before they reach the kind e2e.
+      - name: install bats
+        run: sudo apt-get update && sudo apt-get install -y bats
+
+      - name: bats unit tests
+        run: bats tests/*.bats
