@@ -144,9 +144,20 @@ spec:
               {{- end }}
 
               {{- if .Values.siteInstall.snapshotsDir }}
-              # FrankenPress snapshot apply. Iterates every subdir under
-              # siteInstall.snapshotsDir whose manifest.json exists and
-              # runs `wp fp apply --snapshot-dir=<dir>` per snapshot.
+              # FrankenPress snapshot apply. Picks the snapshot dir
+              # under siteInstall.snapshotsDir whose manifest.json
+              # carries the highest `created` (UTC ISO 8601) and runs
+              # `wp fp apply --snapshot-dir=<dir>` against it.
+              #
+              # Multiple snapshot dirs may coexist under SNAPSHOTS_DIR
+              # — the FrankenPress convention is that designers commit
+              # iterations as new dirs (e.g. timestamped slugs) rather
+              # than `git rm`-ing the previous one. Git log + commit
+              # messages carry the human-readable "what changed";
+              # `manifest.created` is the deterministic apply-order key.
+              # Pre-Phase-2 the loop iterated alphabetically and let
+              # last-write-win; pick-latest-by-`created` is the
+              # deterministic successor to that bug fix.
               #
               # `wp fp apply` (frankenpress/mu-plugin v0.8.0+) is
               # adapter-scoped + additive — uses WP-Importer for content,
@@ -162,44 +173,55 @@ spec:
               # build path.
               SNAPSHOTS_DIR={{ .Values.siteInstall.snapshotsDir | quote }}
               if [ -d "$SNAPSHOTS_DIR" ]; then
-                # Enforce the single-snapshot convention: at most one
-                # snapshot directory with a manifest.json may exist
-                # under SNAPSHOTS_DIR per release. Pre-Phase-2 the
-                # loop iterated alphabetically and let last-write-win;
-                # that quietly applied stale snapshots from forgotten
-                # earlier releases alongside the canonical current
-                # one, producing wrong-design-state renders.
-                #
-                # Convention: commit one snapshot dir per release under
-                # web/imports/<slug>/, `git rm` the previous one in
-                # the same PR. The install Job refuses to apply when
-                # multiple snapshot dirs are present.
                 manifest_count=$(find "$SNAPSHOTS_DIR" -mindepth 2 -maxdepth 2 -name manifest.json -type f 2>/dev/null | wc -l | tr -d ' ')
-                if [ "$manifest_count" -gt 1 ]; then
-                  echo "[snapshot] ERROR: $manifest_count snapshot directories with manifest.json under $SNAPSHOTS_DIR — the convention is one snapshot per release."
-                  echo "[snapshot] Snapshot directories found:"
-                  find "$SNAPSHOTS_DIR" -mindepth 2 -maxdepth 2 -name manifest.json -type f 2>/dev/null | xargs -n1 dirname
-                  echo "[snapshot] Remove stale snapshot dirs from the site repo (web/imports/<old-slug>/) and re-tag. Apply will not proceed until this is resolved."
-                  exit 1
-                fi
-
-                # Subdir count drives the "no snapshots committed yet"
-                # log line below. The for-loop's manifest.json gate
-                # skips .gitkeep-only subdirs.
-                snap_count=$(find "$SNAPSHOTS_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
-                if [ "$snap_count" -eq 0 ]; then
-                  echo "[snapshot] no snapshot directories under $SNAPSHOTS_DIR (designer hasn't committed any yet)"
+                if [ "$manifest_count" -eq 0 ]; then
+                  echo "[snapshot] no snapshot manifest.json files under $SNAPSHOTS_DIR (designer hasn't committed any yet)"
                 else
-                  echo "[snapshot] processing $snap_count snapshot directories under $SNAPSHOTS_DIR"
-                  for snap_dir in "$SNAPSHOTS_DIR"/*/; do
-                    [ -d "$snap_dir" ] || continue
-                    if [ ! -f "${snap_dir}manifest.json" ]; then
-                      echo "[snapshot] skipping ${snap_dir%/} (no manifest.json)"
-                      continue
+                  # Single-snapshot fast path: skip the per-manifest
+                  # parse, just apply the only candidate. Preserves
+                  # behaviour for tenants who haven't accumulated
+                  # iterations yet.
+                  if [ "$manifest_count" -eq 1 ]; then
+                    latest_dir=$(find "$SNAPSHOTS_DIR" -mindepth 2 -maxdepth 2 -name manifest.json -type f 2>/dev/null | head -1 | xargs dirname)
+                  else
+                    # PHP is the canonical JSON parser available in the
+                    # runtime image (FrankenPHP base); jq is not.
+                    latest_dir=$(php -r '
+                      $best_created = null; $best_dir = null;
+                      foreach (glob($argv[1] . "/*/manifest.json") as $manifest) {
+                        $data = json_decode(file_get_contents($manifest), true);
+                        if (!is_array($data)) { continue; }
+                        $created = (string)($data["created"] ?? "");
+                        if ($created === "") { continue; }
+                        if ($best_created === null || $created > $best_created) {
+                          $best_created = $created;
+                          $best_dir = dirname($manifest);
+                        }
+                      }
+                      if ($best_dir === null) {
+                        fwrite(STDERR, "no manifest contained a \"created\" field; cannot pick latest\n");
+                        exit(1);
+                      }
+                      echo $best_dir;
+                    ' "$SNAPSHOTS_DIR")
+                    if [ -z "$latest_dir" ]; then
+                      echo "[snapshot] ERROR: failed to pick a snapshot from $manifest_count candidate manifests under $SNAPSHOTS_DIR"
+                      echo "[snapshot] Snapshot directories found:"
+                      find "$SNAPSHOTS_DIR" -mindepth 2 -maxdepth 2 -name manifest.json -type f 2>/dev/null | xargs -n1 dirname
+                      echo "[snapshot] check that every manifest.json has a valid \"created\" UTC ISO 8601 timestamp."
+                      exit 1
                     fi
-                    echo "[snapshot] applying ${snap_dir%/}"
-                    ( set -x; $WP fp apply --snapshot-dir="${snap_dir%/}" )
-                  done
+                    echo "[snapshot] $manifest_count snapshot directories found; picking latest by manifest.created:"
+                    find "$SNAPSHOTS_DIR" -mindepth 2 -maxdepth 2 -name manifest.json -type f 2>/dev/null | xargs -n1 dirname | while read -r dir; do
+                      if [ "$dir" = "$latest_dir" ]; then
+                        echo "  -> $dir (picked)"
+                      else
+                        echo "     $dir (skipped — older)"
+                      fi
+                    done
+                  fi
+                  echo "[snapshot] applying $latest_dir"
+                  ( set -x; $WP fp apply --snapshot-dir="$latest_dir" )
                 fi
               else
                 echo "[snapshot] $SNAPSHOTS_DIR not found; no snapshots in this image"
