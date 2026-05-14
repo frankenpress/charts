@@ -80,168 +80,7 @@ spec:
             - /bin/sh
             - -c
             - |
-              set -eu
-              WP="wp --allow-root --path=/app/web/wp"
-
-              # Direct mysqli probe — doesn't load WordPress, so it works
-              # before `wp core install` has created wp_options. (`wp db *`
-              # commands all bootstrap WP first and hard-fail with "site
-              # not installed" on a fresh DB. `wp db check` also shells
-              # out to `mysqlcheck` which isn't in the runtime image.)
-              db_ready() {
-                php -r '
-                  $m = @new mysqli(
-                    getenv("DB_HOST"),
-                    getenv("DB_USER"),
-                    getenv("DB_PASSWORD")
-                  );
-                  if ($m->connect_errno) { exit(1); }
-                  $m->close();
-                ' >/dev/null 2>&1
-              }
-
-              echo "[install] waiting for database..."
-              for i in $(seq 1 60); do
-                if db_ready; then
-                  echo "[install] db ready (iter=$i)"
-                  break
-                fi
-                sleep 2
-              done
-              # Fail fast if the wait loop never saw a healthy DB.
-              db_ready || {
-                echo "[install] database never became reachable; aborting"
-                exit 1
-              }
-
-              if ! $WP core is-installed >/dev/null 2>&1; then
-                echo "[install] running wp core install"
-                $WP core install \
-                  --url="$WP_HOME" \
-                  --title="$SITE_TITLE" \
-                  --admin_user="$ADMIN_USER" \
-                  --admin_email="$ADMIN_EMAIL" \
-                  --admin_password="$ADMIN_PASSWORD" \
-                  {{- if .Values.siteInstall.skipEmail }}
-                  --skip-email
-                  {{- end }}
-              else
-                echo "[install] core already installed; skipping"
-              fi
-
-              echo "[install] running core update-db (idempotent)"
-              $WP core update-db
-
-              {{- if .Values.siteInstall.activeTheme }}
-              # Theme activation. Idempotent — wp_options.{template,stylesheet}
-              # already matching is a no-op. `--skip-themes` so a previously
-              # broken active theme doesn't fatal WP load before we can switch
-              # away from it (recovery path after a botched paid-theme release).
-              # `set -x` echoes the resolved command before exec — avoids
-              # nested-quote rendering issues in a manual `echo "..."` line.
-              echo "[install] activating theme:"
-              ( set -x; $WP --skip-themes theme activate {{ .Values.siteInstall.activeTheme | quote }} )
-              {{- end }}
-
-              {{- if .Values.siteInstall.snapshotsDir }}
-              # FrankenPress snapshot apply. Picks the snapshot dir
-              # under siteInstall.snapshotsDir whose manifest.json
-              # carries the highest `created` (UTC ISO 8601) and runs
-              # `wp fp apply --snapshot-dir=<dir>` against it.
-              #
-              # Multiple snapshot dirs may coexist under SNAPSHOTS_DIR
-              # — the FrankenPress convention is that designers commit
-              # iterations as new dirs (e.g. timestamped slugs) rather
-              # than `git rm`-ing the previous one. Git log + commit
-              # messages carry the human-readable "what changed";
-              # `manifest.created` is the deterministic apply-order key.
-              # Pre-Phase-2 the loop iterated alphabetically and let
-              # last-write-win; pick-latest-by-`created` is the
-              # deterministic successor to that bug fix.
-              #
-              # `wp fp apply` (frankenpress/mu-plugin v0.8.0+) is
-              # adapter-scoped + additive — uses WP-Importer for content,
-              # update_option for scoped options, never DROP / DELETE /
-              # TRUNCATE. Idempotent via fp_snapshot_applied_ref +
-              # fp_snapshot_applied_sha256 option markers; re-runs
-              # short-circuit in <100ms.
-              #
-              # Snapshots are baked into the site image at build time
-              # (committed in the site repo under web/imports/<slug>/);
-              # no S3 fetch, no separate artefact store. Adding /
-              # changing snapshots flows through the normal site image
-              # build path.
-              SNAPSHOTS_DIR={{ .Values.siteInstall.snapshotsDir | quote }}
-              if [ -d "$SNAPSHOTS_DIR" ]; then
-                manifest_count=$(find "$SNAPSHOTS_DIR" -mindepth 2 -maxdepth 2 -name manifest.json -type f 2>/dev/null | wc -l | tr -d ' ')
-                if [ "$manifest_count" -eq 0 ]; then
-                  echo "[snapshot] no snapshot manifest.json files under $SNAPSHOTS_DIR (designer hasn't committed any yet)"
-                else
-                  # Single-snapshot fast path: skip the per-manifest
-                  # parse, just apply the only candidate. Preserves
-                  # behaviour for tenants who haven't accumulated
-                  # iterations yet.
-                  if [ "$manifest_count" -eq 1 ]; then
-                    latest_dir=$(find "$SNAPSHOTS_DIR" -mindepth 2 -maxdepth 2 -name manifest.json -type f 2>/dev/null | head -1 | xargs dirname)
-                  else
-                    # PHP is the canonical JSON parser available in the
-                    # runtime image (FrankenPHP base); jq is not.
-                    latest_dir=$(php -r '
-                      $best_created = null; $best_dir = null;
-                      foreach (glob($argv[1] . "/*/manifest.json") as $manifest) {
-                        $data = json_decode(file_get_contents($manifest), true);
-                        if (!is_array($data)) { continue; }
-                        $created = (string)($data["created"] ?? "");
-                        if ($created === "") { continue; }
-                        if ($best_created === null || $created > $best_created) {
-                          $best_created = $created;
-                          $best_dir = dirname($manifest);
-                        }
-                      }
-                      if ($best_dir === null) {
-                        fwrite(STDERR, "no manifest contained a \"created\" field; cannot pick latest\n");
-                        exit(1);
-                      }
-                      echo $best_dir;
-                    ' "$SNAPSHOTS_DIR")
-                    if [ -z "$latest_dir" ]; then
-                      echo "[snapshot] ERROR: failed to pick a snapshot from $manifest_count candidate manifests under $SNAPSHOTS_DIR"
-                      echo "[snapshot] Snapshot directories found:"
-                      find "$SNAPSHOTS_DIR" -mindepth 2 -maxdepth 2 -name manifest.json -type f 2>/dev/null | xargs -n1 dirname
-                      echo "[snapshot] check that every manifest.json has a valid \"created\" UTC ISO 8601 timestamp."
-                      exit 1
-                    fi
-                    echo "[snapshot] $manifest_count snapshot directories found; picking latest by manifest.created:"
-                    find "$SNAPSHOTS_DIR" -mindepth 2 -maxdepth 2 -name manifest.json -type f 2>/dev/null | xargs -n1 dirname | while read -r dir; do
-                      if [ "$dir" = "$latest_dir" ]; then
-                        echo "  -> $dir (picked)"
-                      else
-                        echo "     $dir (skipped — older)"
-                      fi
-                    done
-                  fi
-                  echo "[snapshot] applying $latest_dir"
-                  ( set -x; $WP fp apply --snapshot-dir="$latest_dir" )
-                fi
-              else
-                echo "[snapshot] $SNAPSHOTS_DIR not found; no snapshots in this image"
-              fi
-              {{- end }}
-
-              {{- with .Values.siteInstall.postDeployCommands }}
-              # Post-deploy commands. Run on every install + upgrade. Failures
-              # exit the Job non-zero (Helm marks release failed; Deployment
-              # itself is not rolled back — pod is already serving traffic).
-              # Same `set -x`-in-a-subshell pattern: arbitrary wp-cli args
-              # (which often contain `"` for PHP eval strings) print + run
-              # cleanly without us hand-quoting each one.
-              echo "[post-deploy] running {{ len . }} command(s):"
-              {{- range . }}
-              ( set -x; $WP {{ . }} )
-              {{- end }}
-              {{- end }}
-
-              echo "[install] done"
+{{ .Files.Get "files/scripts/install.sh" | indent 14 }}
           envFrom:
             - configMapRef:
                 name: {{ printf "%s-env" (include "common.names.fullname" .) }}
@@ -290,6 +129,30 @@ spec:
             {{- end }}
             - name: SITE_TITLE
               value: {{ .Values.siteInstall.title | quote }}
+            # Conditional inputs for files/scripts/install.sh. Each is
+            # consumed by a `[ -n "$VAR" ]` (or `[ "$VAR" = "1" ]`)
+            # guard inside the script, so omitting the value from
+            # values.yaml short-circuits the corresponding stage.
+            - name: SKIP_EMAIL
+              value: {{ ternary "1" "0" .Values.siteInstall.skipEmail | quote }}
+            {{- if .Values.siteInstall.activeTheme }}
+            - name: ACTIVE_THEME
+              value: {{ .Values.siteInstall.activeTheme | quote }}
+            {{- end }}
+            {{- if .Values.siteInstall.snapshotsDir }}
+            - name: SNAPSHOTS_DIR
+              value: {{ .Values.siteInstall.snapshotsDir | quote }}
+            {{- end }}
+            {{- with .Values.siteInstall.postDeployCommands }}
+            # One wp-cli arg string per line. The script reads with
+            # `while IFS= read -r cmd` and `eval`s `$WP $cmd`, matching
+            # the per-line `( set -x; $WP <cmd> )` rendering this replaced.
+            - name: POST_DEPLOY_COMMANDS
+              value: |
+                {{- range . }}
+                {{ . }}
+                {{- end }}
+            {{- end }}
             - name: ADMIN_USER
               valueFrom:
                 secretKeyRef:

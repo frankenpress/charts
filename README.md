@@ -17,7 +17,7 @@ The charts are published as OCI artifacts on GHCR:
 
 ```bash
 helm install mysite oci://ghcr.io/frankenpress/charts/site \
-  --version 0.5.0 \
+  --version 0.12.0 \
   --namespace mysite --create-namespace
 ```
 
@@ -66,6 +66,9 @@ helm template smoketest charts/site --namespace smoketest
 
 # Pull subchart deps
 helm dependency update charts/site
+
+# Unit-test the install Job's shell (no cluster needed)
+bats tests/install.bats
 
 # Install on a kind cluster
 kind create cluster --name fp
