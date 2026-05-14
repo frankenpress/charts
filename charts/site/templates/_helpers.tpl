@@ -198,11 +198,22 @@ component sees no host and is a silent no-op.
 {{- end -}}
 
 {{/*
-Reloader pod-template annotation. Emits
+Reloader watch-list annotation. Emits
 `secret.reloader.stakater.com/reload: "<csv>"` when reloader.enabled
 AND secretsToWatch is non-empty. Pair with stakater/Reloader running
-cluster-wide. Empty/disabled → renders nothing, so the caller can
-splat this into a metadata.annotations block unconditionally.
+cluster-wide.
+
+**Must land on the Deployment object's `metadata.annotations`**, not
+on the pod template's annotations. Stakater Reloader's controller
+reads watch-list annotations off the workload's top-level metadata;
+annotations under `spec.template.metadata.annotations` are where
+Reloader WRITES its `last-reloaded-from` trigger marker, not where
+it reads the watch list. Putting the watch annotation on the pod
+template is silently ignored — Reloader doesn't see it. (v0.13.0
+shipped this in the wrong place; v0.13.1 fixed it.)
+
+Empty / disabled → renders nothing, so the caller can splat this
+into a metadata.annotations block unconditionally.
 */}}
 {{- define "site.reloaderAnnotations" -}}
 {{- if and .Values.reloader.enabled .Values.reloader.secretsToWatch -}}
