@@ -8,7 +8,7 @@ Guidance for Claude Code when working in this repo.
 which deploys a single FrankenPress WordPress site to Kubernetes.
 
 Charts are published as OCI artifacts on GHCR:
-**`oci://ghcr.io/frankenpress/charts/site`** (latest: `v0.12.1` — `charts/site/Chart.yaml` is authoritative).
+**`oci://ghcr.io/frankenpress/charts/site`** (latest: `v0.12.2` — `charts/site/Chart.yaml` is authoritative).
 
 Public docs: **<https://docs.frankenpress.com/components/charts>**
 
@@ -30,8 +30,9 @@ Public docs: **<https://docs.frankenpress.com/components/charts>**
 - `charts/site/templates/_helpers.tpl` — chart-local helpers. **Wraps subchart-vs-external resolution** (`site.databaseHost`, `site.cacheHost`, `site.s3Endpoint`, `site.s3SecretName`, etc.) so flipping `<subchart>.enabled: false` is a one-line change in values.
 - `charts/site/templates/*.yaml` — single-tenant resources for the site: Deployment, Service, ConfigMap (env), Secret (keys+salts), install Job + its Secret, wpcron CronJob, ServiceAccount, HPA, Ingress, HTTPRoute, ServiceMonitor.
 - `charts/site/files/scripts/install.sh` — install/upgrade Job body, sourced into `templates/job-install.yaml` via `.Files.Get`. Pure POSIX shell, env-var driven (`SKIP_EMAIL`, `ACTIVE_THEME`, `SNAPSHOTS_DIR`, `POST_DEPLOY_COMMANDS`). Unit-tested by `tests/install.bats`.
+- `charts/site/files/scripts/sync-admin-credentials.sh` — `sync-admin-credentials` initContainer body, sourced into `templates/deployment.yaml` via `.Files.Get`. Reconciles `wp_users` with the install Secret on every Pod start. Unit-tested by `tests/sync-admin-credentials.bats`; end-to-end gated by `tests/credential-sync-test.sh`.
 - `charts/site/README.md` — chart-specific README (TL;DR + production topology).
-- `tests/install.bats` — bats unit tests for the install-Job shell (sources `install.sh` in library mode with stubbed `wp` / `php`).
+- `tests/install.bats`, `tests/sync-admin-credentials.bats` — bats unit tests for the chart's two extracted shell scripts (each sources its script in library mode with stubbed `wp` / `php`).
 - `tests/lockdown-test.sh`, `tests/credential-sync-test.sh` — kind-cluster end-to-end tests gating the load-bearing lockdown + admin-credential-sync properties.
 - `.github/workflows/lint.yml` — `helm lint` + `helm template` + `chart-testing ct lint` on push/PR.
 - `.github/workflows/release.yml` — **on tag push (`v*.*.*`)**, `helm package` + push to OCI. Tag-driven releases — pushes to main do NOT auto-release.
@@ -45,6 +46,7 @@ Public docs: **<https://docs.frankenpress.com/components/charts>**
 - **`appVersion` tracks `site-template`** — the WordPress site image we test against. Bump it when you bump the default `image.tag` in values.
 - **Install Job picks latest snapshot by `manifest.created` (v0.12.0+).** Multiple `web/imports/<slug>/` directories baked into the site image can coexist — the install Job reads each `manifest.json`, picks the one with the highest `created` UTC timestamp, and applies that one. Older snapshots are logged as `skipped — older` but kept as history. Single-snapshot tenants take a fast path (no per-manifest parse). Pre-v0.12.0 the Job hard-failed on >1 `manifest.json` and tenants had to `git rm` the previous snapshot per release; that constraint is gone. Pairs with `frankenpress/fp` v0.5.0+ which defaults `fp snapshot` slugs to UTC timestamps.
 - **Install-Job shell lives in `files/scripts/install.sh`, not inline in `job-install.yaml`.** The YAML emits a small env-var preamble (`SKIP_EMAIL`, `ACTIVE_THEME`, `SNAPSHOTS_DIR`, `POST_DEPLOY_COMMANDS`) for the conditionals, then sources the script via `{{ .Files.Get "files/scripts/install.sh" | indent 14 }}`. Job inputs hash (which keeps the Job re-firing on values changes — see `job-install.yaml` header) deliberately includes whole `.Values.siteInstall`, so changing `install.sh` itself doesn't bust the hash — bump `Chart.Version` for behavioural changes. When editing the install flow: edit `install.sh`, run `bats tests/install.bats`, then `helm template` to verify the YAML still renders.
+- **Same convention for `sync-admin-credentials` initContainer**: shell body is at `files/scripts/sync-admin-credentials.sh`, sourced from `templates/deployment.yaml` via `.Files.Get`. Env-var driven (`DB_*`, `ADMIN_*`, `FP_SMTP_HOST`). Bats covers user resolution, drift check, silence-file path; kind end-to-end gated by `credential-sync-test.sh`. The `db_ready()` probe is duplicated with `install.sh` on purpose — each script is self-contained, ~10 lines of dupe is cheaper than the indirection of a shared lib.
 
 ## Don'ts
 
@@ -68,8 +70,9 @@ helm template smoketest charts/site --namespace smoketest
 # Pull subchart deps
 helm dependency update charts/site
 
-# Unit-test the install Job's shell body (no cluster, ~1s)
+# Unit-test the chart's extracted shell scripts (no cluster, ~1s each)
 bats tests/install.bats
+bats tests/sync-admin-credentials.bats
 
 # Install on a kind cluster (use a locally-built site image)
 helm install mysite charts/site \
