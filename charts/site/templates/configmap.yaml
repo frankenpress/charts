@@ -20,7 +20,7 @@ data:
   FP_S3_BUCKET: {{ include "site.s3Bucket" . | quote }}
   FP_S3_REGION: {{ include "site.s3Region" . | quote }}
   FP_S3_ENDPOINT: {{ include "site.s3Endpoint" . | quote }}
-  {{- if and (not .Values.minio.enabled) .Values.externalS3.bucketUrl }}
+  {{- if .Values.externalS3.bucketUrl }}
   FP_S3_BUCKET_URL: {{ .Values.externalS3.bucketUrl | quote }}
   {{- end }}
   {{- if .Values.externalS3.objectAcl }}
