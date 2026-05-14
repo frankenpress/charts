@@ -574,7 +574,7 @@ minio:
 ## @param externalS3.bucket S3 bucket name
 ## @param externalS3.region S3 region
 ## @param externalS3.endpoint Custom endpoint URL (leave empty for AWS S3; set for R2 / GCS XML / MinIO)
-## @param externalS3.bucketUrl Public URL clients use to fetch media (CDN URL or bucket URL)
+## @param externalS3.bucketUrl Public URL clients use to fetch media. CDN URL or raw bucket URL for AWS S3 / R2 / GCS XML; port-forward or HTTPRoute URL when the bundled MinIO subchart is enabled (e.g. `http://localhost:9000/site-media`). Required for the Media Library to render thumbnails — when unset, humanmade/s3-uploads bakes canonical `https://<bucket>.s3.amazonaws.com` URLs into attachment GUIDs and post content, which 403 against any non-AWS bucket.
 ## @param externalS3.objectAcl S3 object ACL applied on PUT (`public-read`, `private`, `authenticated-read`). Leave empty for buckets with Object Ownership = "Bucket owner enforced" (the AWS default for new buckets since April 2023). Sending an ACL on such a bucket aborts uploads mid-PUT and leaves 0-byte objects behind.
 ## @param externalS3.accessKey Access key id (or use existingSecret)
 ## @param externalS3.secretKey Secret access key (or use existingSecret)
