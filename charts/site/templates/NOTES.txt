@@ -3,6 +3,28 @@ CHART VERSION: {{ .Chart.Version }}
 APP VERSION:   {{ .Chart.AppVersion }}
 
 Welcome to FrankenPress.
+{{- if or .Values.mariadb.enabled .Values.redis.enabled .Values.minio.enabled }}
+
+================================================================
+  PRODUCTION WARNING — bundled subcharts are enabled
+================================================================
+
+  This release has at least one of mariadb / redis / minio
+  enabled as a bundled Bitnami subchart. These ship as
+  single-Pod StatefulSets, use the bitnamilegacy mirror
+  (no security update SLA), and have no managed backup,
+  restore, or rolling-upgrade story.
+
+  ** DO NOT RUN THEM IN A NON-DEV RELEASE. **
+
+  Production topology: disable the bundled subcharts and wire
+  the chart to external services — see the per-component
+  detail at the bottom of these notes for the recommended
+  operators (mariadb-operator, dragonflydb-operator) and
+  managed alternatives (AWS S3, R2, GCS XML).
+
+================================================================
+{{- end }}
 
 ** Please be patient while the site comes up — the first install bootstraps WP and seeds the database. **
 
