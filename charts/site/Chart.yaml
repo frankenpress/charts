@@ -5,7 +5,7 @@ type: application
 icon: https://frankenpress.com/icon.png
 
 # Chart version. Bumped on every change to templates / values / Chart.yaml.
-version: 0.13.1
+version: 0.13.2
 
 # Application version. Tracks the site-template release we test against.
 appVersion: "0.6.0"
@@ -36,6 +36,10 @@ annotations:
   # Used by ArtifactHub-style consumers.
   category: CMS
   licenses: Apache-2.0
+  # Compatibility floor for the site-template image this chart deploys.
+  # Tracks the oldest site-template release the chart is known compatible
+  # with. Bump when a chart change relies on a newer site-image behaviour.
+  app.kubernetes.io/min-image-version: "0.6.0"
 
 # Dependencies.
 #
