@@ -71,6 +71,22 @@ spec:
                     secretKeyRef:
                       name: {{ include "site.s3SecretName" . }}
                       key: {{ include "site.s3SecretKeyKey" . }}
+                {{- if .Values.snapshotExport.enabled }}
+                - name: FP_SNAPSHOT_BUCKET
+                  value: {{ .Values.snapshotExport.bucket | quote }}
+                - name: FP_SNAPSHOT_REGION
+                  value: {{ default .Values.externalS3.region .Values.snapshotExport.region | quote }}
+                - name: FP_SNAPSHOT_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ tpl .Values.snapshotExport.existingSecret . }}
+                      key: {{ .Values.snapshotExport.existingSecretAccessKeyKey }}
+                - name: FP_SNAPSHOT_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ tpl .Values.snapshotExport.existingSecret . }}
+                      key: {{ .Values.snapshotExport.existingSecretSecretKeyKey }}
+                {{- end }}
                 {{- range $name := list "AUTH_KEY" "SECURE_AUTH_KEY" "LOGGED_IN_KEY" "NONCE_KEY" "AUTH_SALT" "SECURE_AUTH_SALT" "LOGGED_IN_SALT" "NONCE_SALT" }}
                 - name: {{ $name }}
                   valueFrom:
