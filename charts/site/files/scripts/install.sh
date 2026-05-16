@@ -96,6 +96,32 @@ run_core_install() {
       --admin_email="$ADMIN_EMAIL" \
       --admin_password="$ADMIN_PASSWORD"
   fi
+  clean_wp_defaults
+}
+
+# `wp core install` creates three placeholder rows on a fresh DB:
+#   - post ID 1: "Hello world!"    (publish, slug `hello-world`)
+#   - post ID 2: "Sample Page"     (publish, slug `sample-page`)
+#   - post ID 3: "Privacy Policy"  (draft,   slug `privacy-policy`)
+# Subsequent `wp fp apply` imports the snapshot's posts/pages via
+# WP-Importer. When a captured post shares a slug with one of these
+# defaults (the common case — designers edit the default rather than
+# creating a fresh post), WP-Importer does NOT overwrite; it appends
+# `-2` / `-3` to the imported slug. Result: two posts at colliding
+# slugs, wrong one wins query-block display, `page_on_front`
+# resolves to the default Sample Page instead of the imported one,
+# home renders the WP placeholder content.
+#
+# Delete the defaults right after `wp core install` (only on fresh
+# installs — clean_wp_defaults is unreachable when core is-installed
+# returns 0). Errors swallowed: a partial install where defaults
+# didn't materialise isn't fatal, and `wp fp apply` is what we care
+# about — missing defaults can only help it.
+clean_wp_defaults() {
+  echo "[install] removing WP defaults to avoid snapshot-apply slug collisions"
+  for id in 1 2 3; do
+    $WP post delete "$id" --force 2>/dev/null || true
+  done
 }
 
 activate_theme() {

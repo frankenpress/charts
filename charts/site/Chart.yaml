@@ -5,7 +5,7 @@ type: application
 icon: https://frankenpress.com/icon.png
 
 # Chart version. Bumped on every change to templates / values / Chart.yaml.
-version: 0.14.1
+version: 0.14.2
 
 # Application version. Tracks the site-template release we test against.
 appVersion: "0.6.0"

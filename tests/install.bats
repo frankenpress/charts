@@ -265,3 +265,70 @@ EOF
   ! grep -q -- '--skip-email' "$CALL_LOG"
   grep -q 'core install --url=https://example.test' "$CALL_LOG"
 }
+
+# --- clean_wp_defaults --------------------------------------------
+
+@test "clean_wp_defaults: deletes posts 1, 2, 3 with --force" {
+  # All deletes succeed (default stub exit=0).
+  stub wp
+  load_lib
+  run clean_wp_defaults
+  [ "$status" -eq 0 ]
+  grep -q '^wp post delete 1 --force$' "$CALL_LOG"
+  grep -q '^wp post delete 2 --force$' "$CALL_LOG"
+  grep -q '^wp post delete 3 --force$' "$CALL_LOG"
+}
+
+@test "clean_wp_defaults: tolerates missing posts (already deleted)" {
+  # All deletes fail (e.g. partial install where defaults didn't
+  # materialise). clean_wp_defaults must still exit 0 so the install
+  # flow proceeds to apply.
+  stub wp 1
+  load_lib
+  run clean_wp_defaults
+  [ "$status" -eq 0 ]
+  # Confirms we attempted all three even when each errored.
+  [ "$(grep -c '^wp post delete ' "$CALL_LOG")" -eq 3 ]
+}
+
+@test "run_core_install: invokes clean_wp_defaults after a fresh install" {
+  cat >"${STUB_BIN}/wp" <<'EOF'
+#!/bin/sh
+printf 'wp' >>"$CALL_LOG"
+for a in "$@"; do printf ' %s' "$a" >>"$CALL_LOG"; done
+printf '\n' >>"$CALL_LOG"
+case "$*" in
+  *"core is-installed"*) exit 1 ;;
+  *) exit 0 ;;
+esac
+EOF
+  chmod +x "${STUB_BIN}/wp"
+  load_lib
+  export WP_HOME="https://example.test"
+  export SITE_TITLE="Example"
+  export ADMIN_USER="admin"
+  export ADMIN_EMAIL="admin@example.test"
+  export ADMIN_PASSWORD="pw"
+  run run_core_install
+  [ "$status" -eq 0 ]
+  # Confirm the clean step ran (deletes IDs 1/2/3) after the install.
+  grep -q '^wp core install --url' "$CALL_LOG"
+  grep -q '^wp post delete 1 --force$' "$CALL_LOG"
+  grep -q '^wp post delete 2 --force$' "$CALL_LOG"
+  grep -q '^wp post delete 3 --force$' "$CALL_LOG"
+}
+
+@test "run_core_install: skips clean_wp_defaults when core already installed" {
+  stub wp 0
+  load_lib
+  export WP_HOME="https://example.test"
+  export SITE_TITLE="Example"
+  export ADMIN_USER="admin"
+  export ADMIN_EMAIL="admin@example.test"
+  export ADMIN_PASSWORD="pw"
+  run run_core_install
+  [ "$status" -eq 0 ]
+  # No deletes should fire — the site is already installed and
+  # defaults may have been intentionally customised by the operator.
+  ! grep -q 'post delete' "$CALL_LOG"
+}
