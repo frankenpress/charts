@@ -268,10 +268,33 @@ EOF
 
 # --- clean_wp_defaults --------------------------------------------
 
-@test "clean_wp_defaults: deletes posts 1, 2, 3 with --force" {
-  # All deletes succeed (default stub exit=0).
+@test "clean_wp_defaults: no-op when SNAPSHOTS_DIR unset (non-snapshot chart user)" {
   stub wp
   load_lib
+  unset SNAPSHOTS_DIR
+  run clean_wp_defaults
+  [ "$status" -eq 0 ]
+  # No deletes fire — defaults stay; chart is being used as a generic
+  # WP-on-K8s deployment without the snapshot pipeline.
+  ! grep -q 'post delete' "$CALL_LOG"
+}
+
+@test "clean_wp_defaults: no-op when SNAPSHOTS_DIR exists but has no manifests" {
+  stub wp
+  load_lib
+  export SNAPSHOTS_DIR="$BATS_TEST_TMPDIR/empty-snapshots"
+  mkdir -p "$SNAPSHOTS_DIR"
+  run clean_wp_defaults
+  [ "$status" -eq 0 ]
+  ! grep -q 'post delete' "$CALL_LOG"
+}
+
+@test "clean_wp_defaults: deletes posts 1, 2, 3 with --force when a snapshot exists" {
+  stub wp
+  load_lib
+  export SNAPSHOTS_DIR="$BATS_TEST_TMPDIR/snapshots"
+  mkdir -p "$SNAPSHOTS_DIR/some-slug"
+  echo '{"created":"2026-05-16T00:00:00Z"}' > "$SNAPSHOTS_DIR/some-slug/manifest.json"
   run clean_wp_defaults
   [ "$status" -eq 0 ]
   grep -q '^wp post delete 1 --force$' "$CALL_LOG"
@@ -285,13 +308,16 @@ EOF
   # flow proceeds to apply.
   stub wp 1
   load_lib
+  export SNAPSHOTS_DIR="$BATS_TEST_TMPDIR/snapshots"
+  mkdir -p "$SNAPSHOTS_DIR/some-slug"
+  echo '{"created":"2026-05-16T00:00:00Z"}' > "$SNAPSHOTS_DIR/some-slug/manifest.json"
   run clean_wp_defaults
   [ "$status" -eq 0 ]
   # Confirms we attempted all three even when each errored.
   [ "$(grep -c '^wp post delete ' "$CALL_LOG")" -eq 3 ]
 }
 
-@test "run_core_install: invokes clean_wp_defaults after a fresh install" {
+@test "run_core_install: invokes clean_wp_defaults after a fresh install (snapshot present)" {
   cat >"${STUB_BIN}/wp" <<'EOF'
 #!/bin/sh
 printf 'wp' >>"$CALL_LOG"
@@ -309,9 +335,11 @@ EOF
   export ADMIN_USER="admin"
   export ADMIN_EMAIL="admin@example.test"
   export ADMIN_PASSWORD="pw"
+  export SNAPSHOTS_DIR="$BATS_TEST_TMPDIR/snapshots"
+  mkdir -p "$SNAPSHOTS_DIR/some-slug"
+  echo '{"created":"2026-05-16T00:00:00Z"}' > "$SNAPSHOTS_DIR/some-slug/manifest.json"
   run run_core_install
   [ "$status" -eq 0 ]
-  # Confirm the clean step ran (deletes IDs 1/2/3) after the install.
   grep -q '^wp core install --url' "$CALL_LOG"
   grep -q '^wp post delete 1 --force$' "$CALL_LOG"
   grep -q '^wp post delete 2 --force$' "$CALL_LOG"
@@ -326,9 +354,38 @@ EOF
   export ADMIN_USER="admin"
   export ADMIN_EMAIL="admin@example.test"
   export ADMIN_PASSWORD="pw"
+  export SNAPSHOTS_DIR="$BATS_TEST_TMPDIR/snapshots"
+  mkdir -p "$SNAPSHOTS_DIR/some-slug"
+  echo '{"created":"2026-05-16T00:00:00Z"}' > "$SNAPSHOTS_DIR/some-slug/manifest.json"
   run run_core_install
   [ "$status" -eq 0 ]
-  # No deletes should fire — the site is already installed and
-  # defaults may have been intentionally customised by the operator.
+  # No deletes — the site is already installed and defaults may have
+  # been intentionally customised by the operator.
+  ! grep -q 'post delete' "$CALL_LOG"
+}
+
+@test "run_core_install: no defaults cleanup on fresh install without snapshots" {
+  cat >"${STUB_BIN}/wp" <<'EOF'
+#!/bin/sh
+printf 'wp' >>"$CALL_LOG"
+for a in "$@"; do printf ' %s' "$a" >>"$CALL_LOG"; done
+printf '\n' >>"$CALL_LOG"
+case "$*" in
+  *"core is-installed"*) exit 1 ;;
+  *) exit 0 ;;
+esac
+EOF
+  chmod +x "${STUB_BIN}/wp"
+  load_lib
+  export WP_HOME="https://example.test"
+  export SITE_TITLE="Example"
+  export ADMIN_USER="admin"
+  export ADMIN_EMAIL="admin@example.test"
+  export ADMIN_PASSWORD="pw"
+  unset SNAPSHOTS_DIR
+  run run_core_install
+  [ "$status" -eq 0 ]
+  # Generic WP-on-K8s deploy without snapshots — defaults preserved.
+  grep -q '^wp core install --url' "$CALL_LOG"
   ! grep -q 'post delete' "$CALL_LOG"
 }

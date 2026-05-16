@@ -112,12 +112,28 @@ run_core_install() {
 # resolves to the default Sample Page instead of the imported one,
 # home renders the WP placeholder content.
 #
-# Delete the defaults right after `wp core install` (only on fresh
-# installs — clean_wp_defaults is unreachable when core is-installed
-# returns 0). Errors swallowed: a partial install where defaults
-# didn't materialise isn't fatal, and `wp fp apply` is what we care
-# about — missing defaults can only help it.
+# Gated on SNAPSHOTS_DIR having at least one manifest: if no
+# snapshot is about to be applied, the WP defaults are reasonable
+# placeholder content and we don't second-guess the operator.
+# Non-snapshot users of the chart (running it as a generic WP-on-K8s
+# Helm chart) get the default WP content as-is.
+#
+# Called from run_core_install — only fires on fresh installs.
+# `wp core is-installed` short-circuits run_core_install when WP is
+# already there, so the clean step is unreachable on re-runs (won't
+# re-delete defaults an operator may have manually restored).
+#
+# Errors swallowed: a partial install where defaults didn't
+# materialise isn't fatal, and `wp fp apply` is the canonical
+# content source — missing defaults can only help it.
 clean_wp_defaults() {
+  if [ -z "${SNAPSHOTS_DIR:-}" ] || [ ! -d "${SNAPSHOTS_DIR:-}" ]; then
+    return 0
+  fi
+  manifest_count=$(find "$SNAPSHOTS_DIR" -mindepth 2 -maxdepth 2 -name manifest.json -type f 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$manifest_count" -eq 0 ]; then
+    return 0
+  fi
   echo "[install] removing WP defaults to avoid snapshot-apply slug collisions"
   for id in 1 2 3; do
     $WP post delete "$id" --force 2>/dev/null || true
