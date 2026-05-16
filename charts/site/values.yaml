@@ -653,3 +653,37 @@ externalS3:
   accessKey: ""
   secretKey: ""
   existingSecret: ""
+
+## @section Snapshot export (fp pull) — daily capture to an S3 snapshot bucket
+## Drives the prod-side half of the `fp pull` designer flow. When
+## enabled, the site pod gains three env vars
+## (`FP_SNAPSHOT_BUCKET`/`KEY`/`SECRET`) that activate the mu-plugin's
+## `SnapshotExporter` component (5th request-path component, gated on
+## these env vars — dormant when unset). The component registers a
+## daily wp-cron event at site-local midnight and an admin button at
+## Tools → Snapshot Export; both schedule a capture that runs inside
+## the wpcron CronJob's WP-CLI context, then uploads each artifact to
+## `s3://<bucket>/prod-<timestamp>/` via the AWS SDK already loaded
+## by humanmade/s3-uploads. Designers consume the captures via
+## `fp pull` on their local stack.
+##
+## The bucket itself is provisioned out-of-band by `tg_frankenpress`
+## (one per production site, named `<site>-production-snapshots-<region>-<account>`,
+## 7-day lifecycle policy). The IAM service user's credentials live in
+## ASM at `service_user/prod/<site>-production-snapshots`; ESO projects
+## them into the K8s Secret named here.
+
+## @param snapshotExport.enabled Wire snapshot-bucket env vars into the site pod, activating the mu-plugin SnapshotExporter component
+## @param snapshotExport.bucket Snapshot bucket name (e.g. `sts-production-snapshots-eu-west-2-533158516642`)
+## @param snapshotExport.region AWS region of the snapshot bucket (defaults to externalS3.region when empty)
+## @param snapshotExport.existingSecret Pre-existing Secret with `access-key` and `secret-key` keys (typically projected from ASM `service_user/prod/<site>-production-snapshots` via ExternalSecret)
+## @param snapshotExport.existingSecretAccessKeyKey Key in existingSecret holding the access key id
+## @param snapshotExport.existingSecretSecretKeyKey Key in existingSecret holding the secret access key
+##
+snapshotExport:
+  enabled: false
+  bucket: ""
+  region: ""
+  existingSecret: ""
+  existingSecretAccessKeyKey: access-key
+  existingSecretSecretKeyKey: secret-key
