@@ -64,6 +64,7 @@
     "externalCache":                   { "type": "object", "additionalProperties": true },
     "minio":                           { "type": "object", "additionalProperties": true },
     "externalS3":                      { "type": "object", "additionalProperties": true },
+    "snapshotExport":                  { "type": "object", "additionalProperties": true },
 
     "common":                          { "type": "object", "additionalProperties": true }
   }
